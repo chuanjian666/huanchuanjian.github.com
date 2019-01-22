@@ -20,7 +20,7 @@
 <meta property="og:image" content="http://datahacker.me/2019/01/22/spark-sql-streaming-performance-profile/offsetseq-setconf.png">
 <meta property="og:image" content="http://datahacker.me/2019/01/22/spark-sql-streaming-performance-profile/streaming-meta.png">
 <meta property="og:image" content="http://datahacker.me/2019/01/22/spark-sql-streaming-performance-profile/result.png">
-<meta property="og:updated_time" content="2019-01-22T10:28:48.226Z">
+<meta property="og:updated_time" content="2019-01-22T15:29:56.774Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Spark Structured Streaming 性能诊断">
 <meta name="twitter:description" content="最近组内同事和我反馈，我提交到集群上的一个实时计算 Job 资源占用较高，而该 Job 处理数据量不大，所以怀疑有性能问题。 打开 Spark 应用监控后台如下图：">
@@ -99,7 +99,7 @@
 <p><strong>监控后台 Environment 显示配置项值已经为 2，但是 Stage2 的 Task 数依旧为300，说明配置没有生效</strong></p>
 <img src="/2019/01/22/spark-sql-streaming-performance-profile/spark-prop.png" title="spark-prop">
 <p>google 了一圈没有找到相关的资料，只好翻了下 Structured Streaming 相关的源码，发现比较有意思的几点：</p>
-<p>其中 <code>MicroBatchExecution.scala</code> 继承自 <code>StreamExecution.scala</code> 抽象类，管理着 <code>Structured Streaming</code> 这种 <code>Micro-Batch</code> 方式的执行逻辑，与之对应还有 <code>Continuous</code> 方式，相应的子类是 <code>ContinuousExecution.scala</code>，关于 <code>Continuous</code> 方式这里不做详细描述。</p>
+<p>其中 <code>MicroBatchExecution.scala</code> 继承自 <code>StreamExecution.scala</code> 抽象类，管理着 <code>Micro-Batch</code> 方式的执行逻辑，与之对应还有 <code>Continuous</code> 方式，相应的子类是 <code>ContinuousExecution.scala</code>，关于 <code>Continuous</code> 方式这里不做详细描述。</p>
 <p>阅读 <code>MicroBatchExecution.scala -&gt; runActivatedStream</code> 方法，其中有一段初始化逻辑如下：</p>
 <img src="/2019/01/22/spark-sql-streaming-performance-profile/microbatch-runstream.png" title="microbatch-runstream">
 <p><code>currentBatchId</code> 默认为 -1，每次处理完一个 batch 后 +1，继续阅读 <code>populateStartOffsets</code> 方法</p>
@@ -107,7 +107,7 @@
 <p><code>populateStartOffsets</code> 方法会用上一次 batch 的元数据更新下一次 batch 的 <code>SparkSession Config</code>，填充逻辑在 <code>OffsetSeqMetadata.setSessionConf(metadata, sparkSessionToRunBatches.conf)</code> 中</p>
 <img src="/2019/01/22/spark-sql-streaming-performance-profile/offsetseq-setconf.png" title="offsetseq-setconf">
 <p>到此，配置不生效的原因已经清楚了：</p>
-<p><strong>初次执行时没有设置该配置项，导致使用系统默认值 300，后续的 batch 每次都延续上一个 batch 的元数据，所以始终都会是 300</strong></p>
+<p><strong>初次执行时由于没有修改该配置项，导致使用系统默认值 300，后续的 batch 每次都延续上一个 batch 的元数据，所以始终都会是 300</strong></p>
 <p>查看下 <code>HDFS</code> 上元数据也印证了以上结论</p>
 <img src="/2019/01/22/spark-sql-streaming-performance-profile/streaming-meta.png" title="streaming-meta">
 <h4 id="解决办法"><a href="#解决办法" class="headerlink" title="解决办法"></a>解决办法</h4><p>重新指定 <code>checkpoint</code> 路径，重新提交后配置生效，Tasks 数由 305 (5 + 300) 降至 7 (5 + 2)，Job 跑的如丝般顺滑 :)</p>
