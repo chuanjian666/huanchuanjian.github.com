@@ -1,86 +1,331 @@
 <!DOCTYPE html>
-<html>
-<head><meta name="generator" content="Hexo 3.8.0">
-  <meta charset="utf-8">
+
+
+
   
-  <title>Spark Structured Streaming 性能诊断 | datahacker</title>
-  <meta name="viewport" content="width=device-width">
-  <meta name="description" content="最近组内同事和我反馈，我提交到集群上的一个实时计算 Job 资源占用较高，而该 Job 处理数据量不大，所以怀疑有性能问题。 打开 Spark 应用监控后台如下图：">
+
+
+<html class="theme-next pisces use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="Spark SQL, Streaming, Performance,">
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="最近组内同事和我反馈，我提交到集群上的一个实时计算 Job 资源占用较高，而该 Job 处理数据量不大，所以怀疑有性能问题。 打开 Spark 应用监控后台如下图：">
 <meta name="keywords" content="Spark SQL, Streaming, Performance">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Spark Structured Streaming 性能诊断">
 <meta property="og:url" content="http://datahacker.me/2019/01/22/spark-sql-streaming-performance-profile/index.html">
 <meta property="og:site_name" content="datahacker">
 <meta property="og:description" content="最近组内同事和我反馈，我提交到集群上的一个实时计算 Job 资源占用较高，而该 Job 处理数据量不大，所以怀疑有性能问题。 打开 Spark 应用监控后台如下图：">
-<meta property="og:locale" content="default">
+<meta property="og:locale" content="zh-Hans">
 <meta property="og:image" content="http://datahacker.me/2019/01/22/spark-sql-streaming-performance-profile/streaming-job-ui.png">
 <meta property="og:image" content="http://datahacker.me/2019/01/22/spark-sql-streaming-performance-profile/spark-prop.png">
-<meta property="og:image" content="http://datahacker.me/2019/01/22/spark-sql-streaming-performance-profile/microbatch-runstream.png">
-<meta property="og:image" content="http://datahacker.me/2019/01/22/spark-sql-streaming-performance-profile/microbatch-populate.png">
-<meta property="og:image" content="http://datahacker.me/2019/01/22/spark-sql-streaming-performance-profile/offsetseq-setconf.png">
 <meta property="og:image" content="http://datahacker.me/2019/01/22/spark-sql-streaming-performance-profile/streaming-meta.png">
 <meta property="og:image" content="http://datahacker.me/2019/01/22/spark-sql-streaming-performance-profile/result.png">
-<meta property="og:updated_time" content="2019-01-22T15:29:56.774Z">
+<meta property="og:updated_time" content="2019-01-23T02:52:59.091Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Spark Structured Streaming 性能诊断">
 <meta name="twitter:description" content="最近组内同事和我反馈，我提交到集群上的一个实时计算 Job 资源占用较高，而该 Job 处理数据量不大，所以怀疑有性能问题。 打开 Spark 应用监控后台如下图：">
 <meta name="twitter:image" content="http://datahacker.me/2019/01/22/spark-sql-streaming-performance-profile/streaming-job-ui.png">
-  
-    <link rel="alternative" href="/atom.xml" title="datahacker" type="application/atom+xml">
-  
-  
-    <link rel="icon" href="/favicon.ico">
-  
-  <link rel="stylesheet" href="/css/style.css">
-  <!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
-  
-</head></html>
-<body>
-  <div id="container">
-    <div class="mobile-nav-panel">
-	<i class="icon-reorder icon-large"></i>
-</div>
-<header id="header">
-	<h1 class="blog-title">
-		<a href="/">datahacker</a>
-	</h1>
-	<nav class="nav">
-		<ul>
-			<li><a href="/">Home</a></li><li><a href="/archives">Archives</a></li>
-			<li><a id="nav-search-btn" class="nav-icon" title="Search"></a></li>
-			<li><a href="/atom.xml" id="nav-rss-link" class="nav-icon" title="RSS Feed"></a></li>
-		</ul>
-	</nav>
-	<div id="search-form-wrap">
-		<form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="http://datahacker.me"></form>
-	</div>
-</header>
-    <div id="main">
-      <article id="post-spark-sql-streaming-performance-profile" class="post">
-	<footer class="entry-meta-header">
-		<span class="meta-elements date">
-			<a href="/2019/01/22/spark-sql-streaming-performance-profile/" class="article-date">
-  <time datetime="2019-01-22T02:18:10.000Z" itemprop="datePublished">2019-01-22</time>
-</a>
-		</span>
-		<span class="meta-elements author">huanzh</span>
-		<div class="commentscount">
-			
-		</div>
-	</footer>
-	
-	<header class="entry-header">
-		
-  
-    <h1 class="article-title entry-title" itemprop="name">
-      Spark Structured Streaming 性能诊断
-    </h1>
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Pisces',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://datahacker.me/2019/01/22/spark-sql-streaming-performance-profile/">
+
+
+
+
+
+  <title>Spark Structured Streaming 性能诊断 | datahacker</title>
   
 
-	</header>
-	<div class="entry-content">
-		
-    	<p>最近组内同事和我反馈，我提交到集群上的一个实时计算 Job 资源占用较高，而该 Job 处理数据量不大，所以怀疑有性能问题。</p>
+
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?bb11f660ec32a7207f07af91515d39ba";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+</head>
+
+<body itemscope="" itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">datahacker</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle"></p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://datahacker.me/2019/01/22/spark-sql-streaming-performance-profile/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="huanzh">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="datahacker">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">Spark Structured Streaming 性能诊断</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-01-22T10:18:10+08:00">
+                2019-01-22
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2019/01/22/spark-sql-streaming-performance-profile/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count" data-disqus-identifier="2019/01/22/spark-sql-streaming-performance-profile/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>最近组内同事和我反馈，我提交到集群上的一个实时计算 Job 资源占用较高，而该 Job 处理数据量不大，所以怀疑有性能问题。</p>
 <p>打开 Spark 应用监控后台如下图：</p>
 <img src="/2019/01/22/spark-sql-streaming-performance-profile/streaming-job-ui.png" title="spark-job-ui">
 <a id="more"></a>
@@ -101,11 +346,11 @@
 <p>google 了一圈没有找到相关的资料，只好翻了下 Structured Streaming 相关的源码，发现比较有意思的几点：</p>
 <p>其中 <code>MicroBatchExecution.scala</code> 继承自 <code>StreamExecution.scala</code> 抽象类，管理着 <code>Micro-Batch</code> 方式的执行逻辑，与之对应还有 <code>Continuous</code> 方式，相应的子类是 <code>ContinuousExecution.scala</code>，关于 <code>Continuous</code> 方式这里不做详细描述。</p>
 <p>阅读 <code>MicroBatchExecution.scala -&gt; runActivatedStream</code> 方法，其中有一段初始化逻辑如下：</p>
-<img src="/2019/01/22/spark-sql-streaming-performance-profile/microbatch-runstream.png" title="microbatch-runstream">
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Repeatedly attempts to run batches as data arrives.</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">protected</span> <span class="function"><span class="keyword">def</span> <span class="title">runActivatedStream</span></span>(sparkSessionForStream: <span class="type">SparkSession</span>): <span class="type">Unit</span> = &#123;</span><br><span class="line">  triggerExecutor.execute(() =&gt; &#123;</span><br><span class="line">    startTrigger()</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (isActive) &#123;</span><br><span class="line">      reportTimeTaken(<span class="string">"triggerExecution"</span>) &#123;</span><br><span class="line">        <span class="keyword">if</span> (currentBatchId &lt; <span class="number">0</span>) &#123;</span><br><span class="line">          <span class="comment">// We'll do this initialization only once</span></span><br><span class="line">          populateStartOffsets(sparkSessionForStream)</span><br><span class="line">          sparkSession.sparkContext.setJobDescription(getBatchDescriptionString)</span><br><span class="line">          logDebug(<span class="string">s"Stream running from <span class="subst">$committedOffsets</span> to <span class="subst">$availableOffsets</span>"</span>)</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">          constructNextBatch()</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (dataAvailable) &#123;</span><br><span class="line">          currentStatus = currentStatus.copy(isDataAvailable = <span class="literal">true</span>)</span><br><span class="line">          updateStatusMessage(<span class="string">"Processing new data"</span>)</span><br><span class="line">          runBatch(sparkSessionForStream)</span><br><span class="line">        &#125;</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="comment">// Report trigger as finished and construct progress object.</span></span><br><span class="line">      finishTrigger(dataAvailable)</span><br><span class="line">      <span class="keyword">if</span> (dataAvailable) &#123;</span><br><span class="line">        <span class="comment">// Update committed offsets.</span></span><br><span class="line">        commitLog.add(currentBatchId)</span><br><span class="line">        committedOffsets ++= availableOffsets</span><br><span class="line">        logDebug(<span class="string">s"batch <span class="subst">$&#123;currentBatchId&#125;</span> committed"</span>)</span><br><span class="line">        <span class="comment">// We'll increase currentBatchId after we complete processing current batch's data</span></span><br><span class="line">        currentBatchId += <span class="number">1</span></span><br><span class="line">        sparkSession.sparkContext.setJobDescription(getBatchDescriptionString)</span><br><span class="line">      &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        currentStatus = currentStatus.copy(isDataAvailable = <span class="literal">false</span>)</span><br><span class="line">        updateStatusMessage(<span class="string">"Waiting for data to arrive"</span>)</span><br><span class="line">        <span class="type">Thread</span>.sleep(pollingDelayMs)</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    updateStatusMessage(<span class="string">"Waiting for next trigger"</span>)</span><br><span class="line">    isActive</span><br><span class="line">  &#125;)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <p><code>currentBatchId</code> 默认为 -1，每次处理完一个 batch 后 +1，继续阅读 <code>populateStartOffsets</code> 方法</p>
-<img src="/2019/01/22/spark-sql-streaming-performance-profile/microbatch-populate.png" title="microbatch-populate">
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Populate the start offsets to start the execution at the current offsets stored in the sink</span></span><br><span class="line"><span class="comment"> * (i.e. avoid reprocessing data that we have already processed). This function must be called</span></span><br><span class="line"><span class="comment"> * before any processing occurs and will populate the following fields:</span></span><br><span class="line"><span class="comment"> *  - currentBatchId</span></span><br><span class="line"><span class="comment"> *  - committedOffsets</span></span><br><span class="line"><span class="comment"> *  - availableOffsets</span></span><br><span class="line"><span class="comment"> *  The basic structure of this method is as follows:</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"> *  Identify (from the offset log) the offsets used to run the last batch</span></span><br><span class="line"><span class="comment"> *  IF last batch exists THEN</span></span><br><span class="line"><span class="comment"> *    Set the next batch to be executed as the last recovered batch</span></span><br><span class="line"><span class="comment"> *    Check the commit log to see which batch was committed last</span></span><br><span class="line"><span class="comment"> *    IF the last batch was committed THEN</span></span><br><span class="line"><span class="comment"> *      Call getBatch using the last batch start and end offsets</span></span><br><span class="line"><span class="comment"> *      // ^^^^ above line is needed since some sources assume last batch always re-executes</span></span><br><span class="line"><span class="comment"> *      Setup for a new batch i.e., start = last batch end, and identify new end</span></span><br><span class="line"><span class="comment"> *    DONE</span></span><br><span class="line"><span class="comment"> *  ELSE</span></span><br><span class="line"><span class="comment"> *    Identify a brand new batch</span></span><br><span class="line"><span class="comment"> *  DONE</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">private</span> <span class="function"><span class="keyword">def</span> <span class="title">populateStartOffsets</span></span>(sparkSessionToRunBatches: <span class="type">SparkSession</span>): <span class="type">Unit</span> = &#123;</span><br><span class="line">  offsetLog.getLatest() <span class="keyword">match</span> &#123;</span><br><span class="line">    <span class="keyword">case</span> <span class="type">Some</span>((latestBatchId, nextOffsets)) =&gt;</span><br><span class="line">      <span class="comment">/* First assume that we are re-executing the latest known batch</span></span><br><span class="line"><span class="comment">       * in the offset log */</span></span><br><span class="line">      currentBatchId = latestBatchId</span><br><span class="line">      availableOffsets = nextOffsets.toStreamProgress(sources)</span><br><span class="line">      <span class="comment">/* Initialize committed offsets to a committed batch, which at this</span></span><br><span class="line"><span class="comment">       * is the second latest batch id in the offset log. */</span></span><br><span class="line">      <span class="keyword">if</span> (latestBatchId != <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="keyword">val</span> secondLatestBatchId = offsetLog.get(latestBatchId - <span class="number">1</span>).getOrElse &#123;</span><br><span class="line">          <span class="keyword">throw</span> <span class="keyword">new</span> <span class="type">IllegalStateException</span>(<span class="string">s"batch <span class="subst">$&#123;latestBatchId - 1&#125;</span> doesn't exist"</span>)</span><br><span class="line">        &#125;</span><br><span class="line">        committedOffsets = secondLatestBatchId.toStreamProgress(sources)</span><br><span class="line">      &#125;</span><br><span class="line"></span><br><span class="line">      <span class="comment">// update offset metadata</span></span><br><span class="line">      nextOffsets.metadata.foreach &#123; metadata =&gt;</span><br><span class="line">        <span class="type">OffsetSeqMetadata</span>.setSessionConf(metadata, sparkSessionToRunBatches.conf)</span><br><span class="line">        offsetSeqMetadata = <span class="type">OffsetSeqMetadata</span>(</span><br><span class="line">          metadata.batchWatermarkMs, metadata.batchTimestampMs, sparkSessionToRunBatches.conf)</span><br><span class="line">      &#125;</span><br><span class="line"></span><br><span class="line">      <span class="comment">// ...</span></span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
 <p><code>populateStartOffsets</code> 方法会用上一次 batch 的元数据更新下一次 batch 的 <code>SparkSession Config</code>，填充逻辑在 <code>OffsetSeqMetadata.setSessionConf(metadata, sparkSessionToRunBatches.conf)</code> 中</p>
-<img src="/2019/01/22/spark-sql-streaming-performance-profile/offsetseq-setconf.png" title="offsetseq-setconf">
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/** Set the SparkSession configuration with the values in the metadata */</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">setSessionConf</span></span>(metadata: <span class="type">OffsetSeqMetadata</span>, sessionConf: <span class="type">RuntimeConfig</span>): <span class="type">Unit</span> = &#123;</span><br><span class="line">  <span class="type">OffsetSeqMetadata</span>.relevantSQLConfs.map(_.key).foreach &#123; confKey =&gt;</span><br><span class="line"></span><br><span class="line">    metadata.conf.get(confKey) <span class="keyword">match</span> &#123;</span><br><span class="line"></span><br><span class="line">      <span class="keyword">case</span> <span class="type">Some</span>(valueInMetadata) =&gt;</span><br><span class="line">        <span class="comment">// Config value exists in the metadata, update the session config with this value</span></span><br><span class="line">        <span class="keyword">val</span> optionalValueInSession = sessionConf.getOption(confKey)</span><br><span class="line">        <span class="keyword">if</span> (optionalValueInSession.isDefined &amp;&amp; optionalValueInSession.get != valueInMetadata) &#123;</span><br><span class="line">          logWarning(<span class="string">s"Updating the value of conf '<span class="subst">$confKey</span>' in current session from "</span> +</span><br><span class="line">            <span class="string">s"'<span class="subst">$&#123;optionalValueInSession.get&#125;</span>' to '<span class="subst">$valueInMetadata</span>'."</span>)</span><br><span class="line">        &#125;</span><br><span class="line">        sessionConf.set(confKey, valueInMetadata)</span><br><span class="line"></span><br><span class="line">      <span class="keyword">case</span> <span class="type">None</span> =&gt;</span><br><span class="line">        <span class="comment">// For backward compatibility, if a config was not recorded in the offset log,</span></span><br><span class="line">        <span class="comment">// then log it, and let the existing conf value in SparkSession prevail.</span></span><br><span class="line">        logWarning (<span class="string">s"Conf '<span class="subst">$confKey</span>' was not found in the offset log, using existing value"</span>)</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <p>到此，配置不生效的原因已经清楚了：</p>
 <p><strong>初次执行时由于没有修改该配置项，导致使用系统默认值 300，后续的 batch 每次都延续上一个 batch 的元数据，所以始终都会是 300</strong></p>
 <p>查看下 <code>HDFS</code> 上元数据也印证了以上结论</p>
@@ -113,68 +358,403 @@
 <h4 id="解决办法"><a href="#解决办法" class="headerlink" title="解决办法"></a>解决办法</h4><p>重新指定 <code>checkpoint</code> 路径，重新提交后配置生效，Tasks 数由 305 (5 + 300) 降至 7 (5 + 2)，Job 跑的如丝般顺滑 :)</p>
 <img src="/2019/01/22/spark-sql-streaming-performance-profile/result.png" title="result">
 
+      
+    </div>
     
-	</div>
-	<footer class="entry-footer">
-		<div class="entry-meta-footer">
-			<span class="category">
-				
-			</span>
-			<span class="tags">
-				
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Spark-SQL-Streaming-Performance/">Spark SQL, Streaming, Performance</a></li></ul>
+    
+    
 
-			</span>
-		</div>
-	</footer>
-	
     
-<nav id="article-nav">
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/Spark-SQL-Streaming-Performance/" rel="tag"># Spark SQL, Streaming, Performance</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2018/10/22/spark-sql-streaming-monitor-alert/" rel="next" title="Spark Structured Streaming 实现监控告警">
+                <i class="fa fa-chevron-left"></i> Spark Structured Streaming 实现监控告警
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
   
   
-    <a href="/2018/10/22/spark-sql-streaming-monitor-alert/" id="article-nav-older" class="article-nav-link-wrap">
-      <strong class="article-nav-caption">Older</strong>
-      <div class="article-nav-title">
-        
-          Spark Structured Streaming 实现监控告警
-        
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+      <div id="disqus_thread">
+        <noscript>
+          Please enable JavaScript to view the
+          <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a>
+        </noscript>
       </div>
-    </a>
-  
-</nav>
+    </div>
 
   
-</article>
 
 
 
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">huanzh</p>
+              <p class="site-description motion-element" itemprop="description">专注大数据平台，数据分析，数据挖掘等技术</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">2</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">2</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#解决办法"><span class="nav-number">1.</span> <span class="nav-text">解决办法</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
 
     </div>
-    <div class="mb-search">
-  <form action="//google.com/search" method="get" accept-charset="utf-8">
-    <input type="search" name="q" results="0" placeholder="Search">
-    <input type="hidden" name="q" value="site:datahacker.me">
-  </form>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">huanzh</span>
+
+  
 </div>
-<footer id="footer">
-	<h1 class="footer-blog-title">
-		<a href="/">datahacker</a>
-	</h1>
-	<span class="copyright">
-		&copy; 2019 huanzh<br>
-		Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>
-	</span>
-</footer>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Pisces</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
     
 
-<script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+    
 
-
-<link rel="stylesheet" href="/fancybox/jquery.fancybox.css" media="screen" type="text/css">
-<script src="/fancybox/jquery.fancybox.pack.js"></script>
-
-
-<script src="/js/script.js"></script>
   </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=5.1.4"></script>
+
+
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+    
+      <script id="dsq-count-scr" src="https://unclepi.disqus.com/count.js" async></script>
+    
+
+    
+      <script type="text/javascript">
+        var disqus_config = function () {
+          this.page.url = 'http://datahacker.me/2019/01/22/spark-sql-streaming-performance-profile/';
+          this.page.identifier = '2019/01/22/spark-sql-streaming-performance-profile/';
+          this.page.title = 'Spark Structured Streaming 性能诊断';
+        };
+        var d = document, s = d.createElement('script');
+        s.src = 'https://unclepi.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', '' + +new Date());
+        (d.head || d.body).appendChild(s);
+      </script>
+    
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
 </body>
 </html>
