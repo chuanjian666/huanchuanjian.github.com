@@ -5,7 +5,7 @@
   
 
 
-<html class="theme-next pisces use-motion" lang="zh-Hans">
+<html class="theme-next gemini use-motion" lang="zh-Hans">
 <head><meta name="generator" content="Hexo 3.8.0">
   <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -97,7 +97,7 @@
   var NexT = window.NexT || {};
   var CONFIG = {
     root: '/',
-    scheme: 'Pisces',
+    scheme: 'Gemini',
     version: '5.1.4',
     sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
     fancybox: true,
@@ -266,7 +266,7 @@
     <link itemprop="mainEntityOfPage" href="http://datahacker.me/2019/10/10/tech-share-presto-scheduler/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="huanzh">
+      <meta itemprop="name" content="大班">
       <meta itemprop="description" content="">
       <meta itemprop="image" content="/images/avatar.gif">
     </span>
@@ -387,10 +387,175 @@
   
   
   <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://datahacker.me/2019/04/16/presto-source-code-resource-group/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="大班">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="datahacker">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+                
+                <a class="post-title-link" href="/2019/04/16/presto-source-code-resource-group/" itemprop="url">Presto 源码分析 - Resource Group</a></h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-04-16T10:32:59+08:00">
+                2019-04-16
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          
+            <h2 id="开启资源组功能"><a href="#开启资源组功能" class="headerlink" title="开启资源组功能"></a>开启资源组功能</h2><p>在 <code>SqlQueryManager</code> 有一行代码如下：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">queueManager.submit(statement, queryExecution, queryExecutor);</span><br></pre></td></tr></table></figure>
+<p>其中的成员 <code>queueManager</code> 是 <code>QueryQueueManager</code> 类型，它有几个实现类</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">QueryQueueManager</span><br><span class="line">    |</span><br><span class="line">    |--- ResourceGroupManager --- InternalResourceGroupManager</span><br><span class="line">    |</span><br><span class="line">    |--- SqlQueryQueueManager</span><br><span class="line">    |</span><br><span class="line">    |--- ...</span><br></pre></td></tr></table></figure>
+<p>那么在主节点启动时，具体应该实例化哪个类？在 <code>CoordinatorModule</code> 类中，该类主要负责初始化主节点的 Bean，其中这段逻辑决定了创建 <code>QueryQueueManager</code> 的实现类</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (buildConfigObject(FeaturesConfig.class).isResourceGroupsEnabled()) &#123;</span><br><span class="line">    binder.bind(QueryQueueManager.class).to(InternalResourceGroupManager.class);</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">else</span> &#123;</span><br><span class="line">    binder.bind(QueryQueueManager.class).to(SqlQueryQueueManager.class).in(Scopes.SINGLETON);</span><br><span class="line">    binder.bind(<span class="keyword">new</span> TypeLiteral&lt;List&lt;QueryQueueRule&gt;&gt;() &#123;&#125;).toProvider(QueryQueueRuleFactory.class).in(Scopes.SINGLETON);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>所以很清楚，当 <code>resource group</code> 没有启用时，默认使用 <code>SqlQueryQueueManager</code>，启用后使用 <code>InternalResourceGroupManager</code></p>
+<p>查看源码，控制开启的配置是 <code>experimental.resource-groups-enabled=true</code>（在 0.191 中，resource group 是个实验功能，所以是 experimental）</p>
+<h2 id="query-匹配所属的资源组"><a href="#query-匹配所属的资源组" class="headerlink" title="query 匹配所属的资源组"></a>query 匹配所属的资源组</h2><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">submit</span><span class="params">(Statement statement, QueryExecution queryExecution, Executor executor)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    checkState(configurationManager.get() != <span class="keyword">null</span>, <span class="string">"configurationManager not set"</span>);</span><br><span class="line">    ResourceGroupId group;</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">        group = selectGroup(queryExecution);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">catch</span> (PrestoException e) &#123;</span><br><span class="line">        queryExecution.fail(e);</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    createGroupIfNecessary(group, queryExecution, executor);</span><br><span class="line">    groups.get(group).run(queryExecution);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li><p>匹配组：submit 的第一步是 <code>selectGroup</code>，根据 query 的信息 (user, source 等) 匹配 selector，获取对应的 ResourceGroupId</p>
+</li>
+<li><p>创建 InternalResourceGroup：<code>InternalResourceGroupManager</code> 维护了一个<br><code>ConcurrentMap&lt;ResourceGroupId, InternalResourceGroup&gt; groups</code>，创建逻辑在 <code>createGroupIfNecessary</code> 方法，最终构造的 <code>InternalResourceGroup</code> 是一个树形结构，如下图，query 只会被提交到 <code>叶子节点</code></p>
+</li>
+</ul>
+<img src="/2019/04/16/presto-source-code-resource-group/group-tree.png" title="group-tree">
+<h2 id="查询执行"><a href="#查询执行" class="headerlink" title="查询执行"></a>查询执行</h2><p>匹配到 Group 后，<code>QueryExecution</code> 将会提交到对应的 <code>InternalResourceGroup</code> 组内执行，执行的逻辑在 </p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">(QueryExecution query)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>在 <code>run(...)</code> 中包含了两个重要的方法，分别是 <code>canQueueMore()</code> 和 <code>canRunMore</code>，分别决定是否能够排队以及运行</p>
+<h3 id="canQueueMore"><a href="#canQueueMore" class="headerlink" title="canQueueMore"></a>canQueueMore</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">boolean</span> <span class="title">canQueueMore</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    checkState(Thread.holdsLock(root), <span class="string">"Must hold lock"</span>);</span><br><span class="line">    <span class="keyword">synchronized</span> (root) &#123;</span><br><span class="line">        <span class="keyword">return</span> descendantQueuedQueries + queuedQueries.size() &lt; maxQueuedQueries;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>descendantQueuedQueries</code> 表示 subGroup 当前排队的查询数，这里该方法完整的含义表示：subGroup 和当前组排队中的查询数之和，不能超过当前组配置的最大查询数</p>
+<h3 id="canRunMore"><a href="#canRunMore" class="headerlink" title="canRunMore"></a>canRunMore</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">boolean</span> <span class="title">canRunMore</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    checkState(Thread.holdsLock(root), <span class="string">"Must hold lock"</span>);</span><br><span class="line">    <span class="keyword">synchronized</span> (root) &#123;</span><br><span class="line">        <span class="keyword">if</span> (cpuUsageMillis &gt;= hardCpuLimitMillis) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="keyword">false</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">int</span> hardConcurrencyLimit = <span class="keyword">this</span>.hardConcurrencyLimit;</span><br><span class="line">        <span class="keyword">if</span> (cpuUsageMillis &gt;= softCpuLimitMillis) &#123;</span><br><span class="line">            <span class="comment">// <span class="doctag">TODO:</span> Consider whether cpu limit math should be performed on softConcurrency or hardConcurrency</span></span><br><span class="line">            <span class="comment">// Linear penalty between soft and hard limit</span></span><br><span class="line">            <span class="keyword">double</span> penalty = (cpuUsageMillis - softCpuLimitMillis) / (<span class="keyword">double</span>) (hardCpuLimitMillis - softCpuLimitMillis);</span><br><span class="line">            hardConcurrencyLimit = (<span class="keyword">int</span>) Math.floor(hardConcurrencyLimit * (<span class="number">1</span> - penalty));</span><br><span class="line">            <span class="comment">// Always penalize by at least one</span></span><br><span class="line">            hardConcurrencyLimit = min(<span class="keyword">this</span>.hardConcurrencyLimit - <span class="number">1</span>, hardConcurrencyLimit);</span><br><span class="line">            <span class="comment">// Always allow at least one running query</span></span><br><span class="line">            hardConcurrencyLimit = Math.max(<span class="number">1</span>, hardConcurrencyLimit);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> runningQueries.size() + descendantRunningQueries &lt; hardConcurrencyLimit &amp;&amp;</span><br><span class="line">                cachedMemoryUsageBytes &lt;= softMemoryLimitBytes;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这段逻辑主要有两个概念需要注意的，<code>hard</code> 和 <code>soft</code> 配置，可以理解为 <code>hard</code> 是硬性限制，不允许超过该设置，<code>soft</code> 是软性限制，允许一定程度的过载</p>
+<p>这里举个例子</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">hardCpu=10000ms</span><br><span class="line">softCpu=8000ms</span><br><span class="line">hardConcurrency=100</span><br><span class="line"></span><br><span class="line">cpuUsage=9000ms</span><br></pre></td></tr></table></figure>
+<ul>
+<li>如果当前组已经累计cpu耗时超过 <code>hardCpuLimitMillis</code> 限制，直接不允许执行</li>
+<li>在没有超过 <code>hardCpuLimitMillis</code> 后，但是超过 <code>softCpuLimitMillis</code> 时，这里有点复杂，可以根据例子来计算下<ol>
+<li>先计算超出 <code>softCpu</code> 的比例，<code>double penalty = (cpuUsageMillis - softCpuLimitMillis) / (double) (hardCpuLimitMillis - softCpuLimitMillis)</code>，根据上面的例子 penalty=0.5</li>
+<li>根据超出的比例，调整并发上限（资源已经超用了，要根据超用情况降低并发上限），hardConcurrencyLimit=100*0.5=50</li>
+<li>最终并发上限调整为50（这里 min, max 是为了保证至少允许一个查询执行）</li>
+</ol>
+</li>
+<li>最终表达式 `runningQueries.size() + descendantRunningQueries &lt; hardConcurrencyLimit &amp;&amp;<pre><code>cachedMemoryUsageBytes &lt;= softMemoryLimitBytes`，正在运行的查询数（包括 subGroup ）小于并发限制，且内存使用量小于设置的内存资源上限
+</code></pre></li>
+</ul>
+<p>其实 presto 资源的隔离限制，主要是从下面这几个维度进行控制</p>
+<h4 id="并发"><a href="#并发" class="headerlink" title="并发"></a>并发</h4><p>关于并发，主要是 <code>hardConcurrencyLimit</code>，<code>runningQueries.size() + descendantRunningQueries &lt; hardConcurrencyLimit</code> 这段逻辑进行了并发限制</p>
+<h4 id="CPU"><a href="#CPU" class="headerlink" title="CPU"></a>CPU</h4><p>CPU 主要对在该组内执行的 sql 消耗的 cpu 时间 <code>cpuUsageMillis</code> 进行累加，然后进行判断达到上限 <code>hardCpuLimitMilli</code>，该值默认是 Long.MAX_VALUE。这里有个问题：随着运行的 sql 越来越多，如果一直累加 <code>cpuUsageMillis</code>，岂不是很容易就超过 <code>hardCpuLimitMilli</code> ？（继续阅读源码，发现 group 会定时执行生成 cpu 时间片的逻辑，模拟释放 cpu 资源的逻辑，这里就会定时减少 <code>cpuUsageMillis</code>，保证不会无限增长），代码如下</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title">internalGenerateCpuQuota</span><span class="params">(<span class="keyword">long</span> elapsedSeconds)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    checkState(Thread.holdsLock(root), <span class="string">"Must hold lock to generate cpu quota"</span>);</span><br><span class="line">    <span class="keyword">synchronized</span> (root) &#123;</span><br><span class="line">        <span class="keyword">long</span> newQuota;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            newQuota = Math.multiplyExact(elapsedSeconds, cpuQuotaGenerationMillisPerSecond);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">catch</span> (ArithmeticException e) &#123;</span><br><span class="line">            newQuota = Long.MAX_VALUE;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            cpuUsageMillis = Math.subtractExact(cpuUsageMillis, newQuota);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">catch</span> (ArithmeticException e) &#123;</span><br><span class="line">            cpuUsageMillis = <span class="number">0</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        cpuUsageMillis = Math.max(<span class="number">0</span>, cpuUsageMillis);</span><br><span class="line">        <span class="keyword">for</span> (InternalResourceGroup group : subGroups.values()) &#123;</span><br><span class="line">            group.internalGenerateCpuQuota(elapsedSeconds);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="内存"><a href="#内存" class="headerlink" title="内存"></a>内存</h4><p><code>cachedMemoryUsageBytes &lt;= softMemoryLimitBytes</code> 这段描述了 group 内存使用控制，主要看下 presto 是如何记录 <code>cachedMemoryUsageBytes</code> 的</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Memory usage stats are expensive to maintain, so this method must be called periodically to update them</span></span><br><span class="line"><span class="function"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title">internalRefreshStats</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    checkState(Thread.holdsLock(root), <span class="string">"Must hold lock to refresh stats"</span>);</span><br><span class="line">    <span class="keyword">synchronized</span> (root) &#123;</span><br><span class="line">        <span class="keyword">if</span> (subGroups.isEmpty()) &#123;</span><br><span class="line">            cachedMemoryUsageBytes = <span class="number">0</span>;</span><br><span class="line">            <span class="keyword">for</span> (QueryExecution query : runningQueries) &#123;</span><br><span class="line">                cachedMemoryUsageBytes += query.getTotalMemoryReservation();</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">else</span> &#123;</span><br><span class="line">            <span class="keyword">for</span> (Iterator&lt;InternalResourceGroup&gt; iterator = dirtySubGroups.iterator(); iterator.hasNext(); ) &#123;</span><br><span class="line">                InternalResourceGroup subGroup = iterator.next();</span><br><span class="line">                <span class="keyword">long</span> oldMemoryUsageBytes = subGroup.cachedMemoryUsageBytes;</span><br><span class="line">                cachedMemoryUsageBytes -= oldMemoryUsageBytes;</span><br><span class="line">                subGroup.internalRefreshStats();</span><br><span class="line">                cachedMemoryUsageBytes += subGroup.cachedMemoryUsageBytes;</span><br><span class="line">                <span class="keyword">if</span> (!subGroup.isDirty()) &#123;</span><br><span class="line">                    iterator.remove();</span><br><span class="line">                &#125;</span><br><span class="line">                <span class="keyword">if</span> (oldMemoryUsageBytes != subGroup.cachedMemoryUsageBytes) &#123;</span><br><span class="line">                    subGroup.updateEligiblility();</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>作者的注释：记录内存使用情况的维护成本高，因此只能定时调用该方法来更新</p>
+<p>所以这段方法最重要的一行就是 <code>cachedMemoryUsageBytes += query.getTotalMemoryReservation();</code> 获取当前组所有运行的 sql，累加他们已申请的内存量。</p>
+<p>阅读源码发现，系统的刷新频率为1ms一次</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>Resource Group 还支持一些其他的资源控制，比如队列长度、排队时长、运行时长、调度策略等，以上是我认为比较核心的配置，掌握这些配置的原理，结合生产环境的实际情况，可以更好的设计队列拆分规则。</p>
+
+          
+        
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
     <link itemprop="mainEntityOfPage" href="http://datahacker.me/2019/01/22/spark-sql-streaming-performance-profile/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="huanzh">
+      <meta itemprop="name" content="大班">
       <meta itemprop="description" content="">
       <meta itemprop="image" content="/images/avatar.gif">
     </span>
@@ -516,7 +681,7 @@
     <link itemprop="mainEntityOfPage" href="http://datahacker.me/2018/11/23/flume-kafka-to-hdfs/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="huanzh">
+      <meta itemprop="name" content="大班">
       <meta itemprop="description" content="">
       <meta itemprop="image" content="/images/avatar.gif">
     </span>
@@ -641,7 +806,7 @@
     <link itemprop="mainEntityOfPage" href="http://datahacker.me/2018/10/22/spark-sql-streaming-monitor-alert/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="huanzh">
+      <meta itemprop="name" content="大班">
       <meta itemprop="description" content="">
       <meta itemprop="image" content="/images/avatar.gif">
     </span>
@@ -766,7 +931,7 @@
     <link itemprop="mainEntityOfPage" href="http://datahacker.me/2018/09/08/kafka-manager-usage/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="huanzh">
+      <meta itemprop="name" content="大班">
       <meta itemprop="description" content="">
       <meta itemprop="image" content="/images/avatar.gif">
     </span>
@@ -893,7 +1058,7 @@
     <link itemprop="mainEntityOfPage" href="http://datahacker.me/2018/04/12/tech-share-streaming/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="huanzh">
+      <meta itemprop="name" content="大班">
       <meta itemprop="description" content="">
       <meta itemprop="image" content="/images/avatar.gif">
     </span>
@@ -1017,7 +1182,7 @@
     <link itemprop="mainEntityOfPage" href="http://datahacker.me/2017/11/10/tech-share-rabbitmq/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="huanzh">
+      <meta itemprop="name" content="大班">
       <meta itemprop="description" content="">
       <meta itemprop="image" content="/images/avatar.gif">
     </span>
@@ -1160,7 +1325,7 @@
         <div class="site-overview">
           <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
             
-              <p class="site-author-name" itemprop="name">huanzh</p>
+              <p class="site-author-name" itemprop="name">大班</p>
               <p class="site-description motion-element" itemprop="description">专注分布式计算与存储、大数据平台，数据分析等技术</p>
           </div>
 
@@ -1171,7 +1336,7 @@
               
                 <a href="/archives/">
               
-                  <span class="site-state-item-count">7</span>
+                  <span class="site-state-item-count">8</span>
                   <span class="site-state-item-name">日志</span>
                 </a>
               </div>
@@ -1221,11 +1386,11 @@
 
     <footer id="footer" class="footer">
       <div class="footer-inner">
-        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2020</span>
   <span class="with-love">
     <i class="fa fa-user"></i>
   </span>
-  <span class="author" itemprop="copyrightHolder">huanzh</span>
+  <span class="author" itemprop="copyrightHolder">大班</span>
 
   
 </div>
@@ -1239,7 +1404,7 @@
 
 
 
-  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Pisces</a> v5.1.4</div>
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Gemini</a> v5.1.4</div>
 
 
 
