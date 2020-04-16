@@ -6,7 +6,7 @@
 
 
 <html class="theme-next gemini use-motion" lang="zh-Hans">
-<head><meta name="generator" content="Hexo 3.8.0">
+<head><meta name="generator" content="Hexo 3.9.0">
   <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
@@ -79,19 +79,19 @@
 
 
 
-<meta name="description" content="开启资源组功能在 SqlQueryManager 有一行代码如下： 1queueManager.submit(statement, queryExecution, queryExecutor); 其中的成员 queueManager 是 QueryQueueManager 类型，它有几个实现类 1234567QueryQueueManager    |    |--- ResourceGroupM">
+<meta name="description" content="Presto Resource Group 提供了资源控制功能，保证了集群的稳定运行，最近学习了下如何使用，阅读了相关源码，以下分析基于 presto 0.191  开启资源组功能在 SqlQueryManager 有一行代码如下： 1queueManager.submit(statement, queryExecution, queryExecutor); 其中的成员 queueManager">
 <meta name="keywords" content="presto">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Presto 源码分析 - Resource Group">
 <meta property="og:url" content="http://datahacker.me/2019/04/16/presto-source-code-resource-group/index.html">
 <meta property="og:site_name" content="datahacker">
-<meta property="og:description" content="开启资源组功能在 SqlQueryManager 有一行代码如下： 1queueManager.submit(statement, queryExecution, queryExecutor); 其中的成员 queueManager 是 QueryQueueManager 类型，它有几个实现类 1234567QueryQueueManager    |    |--- ResourceGroupM">
+<meta property="og:description" content="Presto Resource Group 提供了资源控制功能，保证了集群的稳定运行，最近学习了下如何使用，阅读了相关源码，以下分析基于 presto 0.191  开启资源组功能在 SqlQueryManager 有一行代码如下： 1queueManager.submit(statement, queryExecution, queryExecutor); 其中的成员 queueManager">
 <meta property="og:locale" content="zh-Hans">
 <meta property="og:image" content="http://datahacker.me/2019/04/16/presto-source-code-resource-group/group-tree.png">
-<meta property="og:updated_time" content="2020-04-16T03:37:19.811Z">
+<meta property="og:updated_time" content="2020-04-16T06:10:56.514Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Presto 源码分析 - Resource Group">
-<meta name="twitter:description" content="开启资源组功能在 SqlQueryManager 有一行代码如下： 1queueManager.submit(statement, queryExecution, queryExecutor); 其中的成员 queueManager 是 QueryQueueManager 类型，它有几个实现类 1234567QueryQueueManager    |    |--- ResourceGroupM">
+<meta name="twitter:description" content="Presto Resource Group 提供了资源控制功能，保证了集群的稳定运行，最近学习了下如何使用，阅读了相关源码，以下分析基于 presto 0.191  开启资源组功能在 SqlQueryManager 有一行代码如下： 1queueManager.submit(statement, queryExecution, queryExecutor); 其中的成员 queueManager">
 <meta name="twitter:image" content="http://datahacker.me/2019/04/16/presto-source-code-resource-group/group-tree.png">
 
 
@@ -150,7 +150,7 @@
 
 </head>
 
-<body itemscope="" itemtype="http://schema.org/WebPage" lang="zh-Hans">
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
 
   
   
@@ -160,7 +160,7 @@
   <div class="container sidebar-position-left page-post-detail">
     <div class="headband"></div>
 
-    <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
       <div class="header-inner"><div class="site-brand-wrapper">
   <div class="site-meta ">
     
@@ -260,20 +260,20 @@
   
   
 
-  <article class="post post-type-normal" itemscope="" itemtype="http://schema.org/Article">
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
   
   
   
   <div class="post-block">
     <link itemprop="mainEntityOfPage" href="http://datahacker.me/2019/04/16/presto-source-code-resource-group/">
 
-    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="name" content="大班">
-      <meta itemprop="description" content="">
+      <meta itemprop="description" content>
       <meta itemprop="image" content="/images/avatar.gif">
     </span>
 
-    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
       <meta itemprop="name" content="datahacker">
     </span>
 
@@ -342,7 +342,8 @@
       
 
       
-        <h2 id="开启资源组功能"><a href="#开启资源组功能" class="headerlink" title="开启资源组功能"></a>开启资源组功能</h2><p>在 <code>SqlQueryManager</code> 有一行代码如下：</p>
+        <p>Presto Resource Group 提供了资源控制功能，保证了集群的稳定运行，最近学习了下如何使用，阅读了相关源码，以下分析基于 presto 0.191 </p>
+<h2 id="开启资源组功能"><a href="#开启资源组功能" class="headerlink" title="开启资源组功能"></a>开启资源组功能</h2><p>在 <code>SqlQueryManager</code> 有一行代码如下：</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">queueManager.submit(statement, queryExecution, queryExecutor);</span><br></pre></td></tr></table></figure>
 <p>其中的成员 <code>queueManager</code> 是 <code>QueryQueueManager</code> 类型，它有几个实现类</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">QueryQueueManager</span><br><span class="line">    |</span><br><span class="line">    |--- ResourceGroupManager --- InternalResourceGroupManager</span><br><span class="line">    |</span><br><span class="line">    |--- SqlQueryQueueManager</span><br><span class="line">    |</span><br><span class="line">    |--- ...</span><br></pre></td></tr></table></figure>
@@ -586,7 +587,7 @@
 
       <section class="site-overview-wrap sidebar-panel">
         <div class="site-overview">
-          <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
             
               <p class="site-author-name" itemprop="name">大班</p>
               <p class="site-description motion-element" itemprop="description">专注分布式计算与存储、大数据平台，数据分析等技术</p>
