@@ -88,7 +88,7 @@
 <meta property="og:description" content="Presto Resource Group 提供了资源控制功能，保证了集群的稳定运行，最近学习了下如何使用，阅读了相关源码，以下分析基于 presto 0.191  开启资源组功能在 SqlQueryManager 有一行代码如下： 1queueManager.submit(statement, queryExecution, queryExecutor); 其中的成员 queueManager">
 <meta property="og:locale" content="zh-Hans">
 <meta property="og:image" content="http://datahacker.me/2019/04/16/presto-source-code-resource-group/group-tree.png">
-<meta property="og:updated_time" content="2020-04-16T06:10:56.514Z">
+<meta property="og:updated_time" content="2020-04-17T01:11:58.126Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Presto 源码分析 - Resource Group">
 <meta name="twitter:description" content="Presto Resource Group 提供了资源控制功能，保证了集群的稳定运行，最近学习了下如何使用，阅读了相关源码，以下分析基于 presto 0.191  开启资源组功能在 SqlQueryManager 有一行代码如下： 1queueManager.submit(statement, queryExecution, queryExecutor); 其中的成员 queueManager">
@@ -348,6 +348,7 @@
 <p>其中的成员 <code>queueManager</code> 是 <code>QueryQueueManager</code> 类型，它有几个实现类</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">QueryQueueManager</span><br><span class="line">    |</span><br><span class="line">    |--- ResourceGroupManager --- InternalResourceGroupManager</span><br><span class="line">    |</span><br><span class="line">    |--- SqlQueryQueueManager</span><br><span class="line">    |</span><br><span class="line">    |--- ...</span><br></pre></td></tr></table></figure>
 <p>那么在主节点启动时，具体应该实例化哪个类？在 <code>CoordinatorModule</code> 类中，该类主要负责初始化主节点的 Bean，其中这段逻辑决定了创建 <code>QueryQueueManager</code> 的实现类</p>
+<a id="more"></a>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (buildConfigObject(FeaturesConfig.class).isResourceGroupsEnabled()) &#123;</span><br><span class="line">    binder.bind(QueryQueueManager.class).to(InternalResourceGroupManager.class);</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">else</span> &#123;</span><br><span class="line">    binder.bind(QueryQueueManager.class).to(SqlQueryQueueManager.class).in(Scopes.SINGLETON);</span><br><span class="line">    binder.bind(<span class="keyword">new</span> TypeLiteral&lt;List&lt;QueryQueueRule&gt;&gt;() &#123;&#125;).toProvider(QueryQueueRuleFactory.class).in(Scopes.SINGLETON);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <p>所以很清楚，当 <code>resource group</code> 没有启用时，默认使用 <code>SqlQueryQueueManager</code>，启用后使用 <code>InternalResourceGroupManager</code></p>
 <p>查看源码，控制开启的配置是 <code>experimental.resource-groups-enabled=true</code>（在 0.191 中，resource group 是个实验功能，所以是 experimental）</p>
