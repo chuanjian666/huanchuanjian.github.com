@@ -452,28 +452,18 @@
 
       
         
-          
-            <p>最近 presto 网关出现几次负载异常问题，导致查询延时变高，最近一次发生后，临时将问题节点从 nginx 下线，在线排查，以下记录排查过程：</p>
+          <p>最近 presto 网关出现几次负载异常问题，导致查询延时变高，最近一次发生后，临时将问题节点从 nginx 下线，在线排查，以下记录排查过程：</p>
 <h4 id="排查过程"><a href="#排查过程" class="headerlink" title="排查过程"></a>排查过程</h4><ol>
 <li>首先排查具体 jvm 哪些线程在高负载的运行，找到对应的线程堆栈可以定位到热点代码：根据 top 排序结合 jstack 信息，发现热点都是 GC 线程，怀疑是 gc 操作导致了负载变高</li>
 </ol>
-<img src="/2021/01/29/presto-gateway-memory-leak/jvm-thread-top.png" width="400" height="400" title="jvm-thread-top">
-<ol start="2">
-<li>于是查看 gc 日志，发现 full gc 频繁，每 30s 一次，从明细来看，Old 区在 11G 左右（最大堆内存设置的 16G），并且 Old 区对象无法正常回收，怀疑存在内存泄露</li>
-</ol>
-<img src="/2021/01/29/presto-gateway-memory-leak/gc-log.png" title="gc-log">
-<ol start="3">
-<li>使用 jmap 查看具体是哪些实例大量占用内存空间</li>
-</ol>
-<img src="/2021/01/29/presto-gateway-memory-leak/jmap-summary.png" title="jmap-summary">
-<img src="/2021/01/29/presto-gateway-memory-leak/jmap-detail.png" title="jmap-detail">
-<p>发现占用最多的 top10 的实例都与 org.terracotta.statistics 包有关，这是 Ehcache 内嵌的统计框架使用的类，怀疑内存泄露与 Ehcache 有关</p>
-<ol start="4">
-<li>搜了下社区也有人遇到类似的问题，根据描述信息基本与我们的问题一致，目前社区给出的方法是升级版本，我们已经修改灰度一台在生产运行，目前正常，继续观察。</li>
-</ol>
-<p><a href="https://github.com/lyft/presto-gateway/issues/94" target="_blank" rel="noopener">Ehcache Memory Leak</a></p>
-<h4 id="改进措施"><a href="#改进措施" class="headerlink" title="改进措施"></a>改进措施</h4>
-          
+<img src="/2021/01/29/presto-gateway-memory-leak/jvm-thread-top.png" title="jvm-thread-top">
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2021/01/29/presto-gateway-memory-leak/#more" rel="contents">
+              阅读全文 &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
         
       
     </div>
