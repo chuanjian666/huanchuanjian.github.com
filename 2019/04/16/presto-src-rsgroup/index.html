@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next gemini use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.9.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="presto,">
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="Presto Resource Group 提供了资源控制功能，保证了集群的稳定运行，最近学习了下如何使用，阅读了相关源码，以下分析基于 presto 0.191  开启资源组功能在 SqlQueryManager 有一行代码如下： 1queueManager.submit(statement, queryExecution, queryExecutor); 其中的成员 queueManager">
+<meta name="keywords" content="presto">
+<meta property="og:type" content="article">
+<meta property="og:title" content="presto 源码分析 - Resource Group">
+<meta property="og:url" content="http://www.datapoilt.com/2019/04/16/presto-src-rsgroup/index.html">
+<meta property="og:site_name" content="DataPilot">
+<meta property="og:description" content="Presto Resource Group 提供了资源控制功能，保证了集群的稳定运行，最近学习了下如何使用，阅读了相关源码，以下分析基于 presto 0.191  开启资源组功能在 SqlQueryManager 有一行代码如下： 1queueManager.submit(statement, queryExecution, queryExecutor); 其中的成员 queueManager">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:image" content="http://www.datapoilt.com/2019/04/16/presto-src-rsgroup/group-tree.png">
+<meta property="og:updated_time" content="2021-12-07T06:28:18.384Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="presto 源码分析 - Resource Group">
+<meta name="twitter:description" content="Presto Resource Group 提供了资源控制功能，保证了集群的稳定运行，最近学习了下如何使用，阅读了相关源码，以下分析基于 presto 0.191  开启资源组功能在 SqlQueryManager 有一行代码如下： 1queueManager.submit(statement, queryExecution, queryExecutor); 其中的成员 queueManager">
+<meta name="twitter:image" content="http://www.datapoilt.com/2019/04/16/presto-src-rsgroup/group-tree.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Gemini',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://www.datapoilt.com/2019/04/16/presto-src-rsgroup/">
+
+
+
+
+
+  <title>presto 源码分析 - Resource Group | DataPilot</title>
+  
+
+
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?bb11f660ec32a7207f07af91515d39ba";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">DataPilot</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle"></p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br>
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://www.datapoilt.com/2019/04/16/presto-src-rsgroup/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="大班">
+      <meta itemprop="description" content>
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DataPilot">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">presto 源码分析 - Resource Group</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-04-16T10:32:59+08:00">
+                2019-04-16
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2019/04/16/presto-src-rsgroup/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count gitment-comments-count" data-xid="/2019/04/16/presto-src-rsgroup/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>Presto Resource Group 提供了资源控制功能，保证了集群的稳定运行，最近学习了下如何使用，阅读了相关源码，以下分析基于 presto 0.191 </p>
+<h2 id="开启资源组功能"><a href="#开启资源组功能" class="headerlink" title="开启资源组功能"></a>开启资源组功能</h2><p>在 <code>SqlQueryManager</code> 有一行代码如下：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">queueManager.submit(statement, queryExecution, queryExecutor);</span><br></pre></td></tr></table></figure>
+<p>其中的成员 <code>queueManager</code> 是 <code>QueryQueueManager</code> 类型，它有几个实现类</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">QueryQueueManager</span><br><span class="line">    |</span><br><span class="line">    |--- ResourceGroupManager --- InternalResourceGroupManager</span><br><span class="line">    |</span><br><span class="line">    |--- SqlQueryQueueManager</span><br><span class="line">    |</span><br><span class="line">    |--- ...</span><br></pre></td></tr></table></figure>
+<p>那么在主节点启动时，具体应该实例化哪个类？在 <code>CoordinatorModule</code> 类中，该类主要负责初始化主节点的 Bean，其中这段逻辑决定了创建 <code>QueryQueueManager</code> 的实现类</p>
+<a id="more"></a>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (buildConfigObject(FeaturesConfig.class).isResourceGroupsEnabled()) &#123;</span><br><span class="line">    binder.bind(QueryQueueManager.class).to(InternalResourceGroupManager.class);</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">else</span> &#123;</span><br><span class="line">    binder.bind(QueryQueueManager.class).to(SqlQueryQueueManager.class).in(Scopes.SINGLETON);</span><br><span class="line">    binder.bind(<span class="keyword">new</span> TypeLiteral&lt;List&lt;QueryQueueRule&gt;&gt;() &#123;&#125;).toProvider(QueryQueueRuleFactory.class).in(Scopes.SINGLETON);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>所以很清楚，当 <code>resource group</code> 没有启用时，默认使用 <code>SqlQueryQueueManager</code>，启用后使用 <code>InternalResourceGroupManager</code></p>
+<p>查看源码，控制开启的配置是 <code>experimental.resource-groups-enabled=true</code>（在 0.191 中，resource group 是个实验功能，所以是 experimental）</p>
+<h2 id="query-匹配所属的资源组"><a href="#query-匹配所属的资源组" class="headerlink" title="query 匹配所属的资源组"></a>query 匹配所属的资源组</h2><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">submit</span><span class="params">(Statement statement, QueryExecution queryExecution, Executor executor)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    checkState(configurationManager.get() != <span class="keyword">null</span>, <span class="string">"configurationManager not set"</span>);</span><br><span class="line">    ResourceGroupId group;</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">        group = selectGroup(queryExecution);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">catch</span> (PrestoException e) &#123;</span><br><span class="line">        queryExecution.fail(e);</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    createGroupIfNecessary(group, queryExecution, executor);</span><br><span class="line">    groups.get(group).run(queryExecution);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li><p>匹配组：submit 的第一步是 <code>selectGroup</code>，根据 query 的信息 (user, source 等) 匹配 selector，获取对应的 ResourceGroupId</p>
+</li>
+<li><p>创建 InternalResourceGroup：<code>InternalResourceGroupManager</code> 维护了一个<br><code>ConcurrentMap&lt;ResourceGroupId, InternalResourceGroup&gt; groups</code>，创建逻辑在 <code>createGroupIfNecessary</code> 方法，最终构造的 <code>InternalResourceGroup</code> 是一个树形结构，如下图，query 只会被提交到 <code>叶子节点</code></p>
+</li>
+</ul>
+<img src="/2019/04/16/presto-src-rsgroup/group-tree.png" title="group-tree">
+<h2 id="查询执行"><a href="#查询执行" class="headerlink" title="查询执行"></a>查询执行</h2><p>匹配到 Group 后，<code>QueryExecution</code> 将会提交到对应的 <code>InternalResourceGroup</code> 组内执行，执行的逻辑在 </p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">(QueryExecution query)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>在 <code>run(...)</code> 中包含了两个重要的方法，分别是 <code>canQueueMore()</code> 和 <code>canRunMore()</code>，分别决定是否能够排队以及运行</p>
+<h3 id="canQueueMore"><a href="#canQueueMore" class="headerlink" title="canQueueMore"></a>canQueueMore</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">boolean</span> <span class="title">canQueueMore</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    checkState(Thread.holdsLock(root), <span class="string">"Must hold lock"</span>);</span><br><span class="line">    <span class="keyword">synchronized</span> (root) &#123;</span><br><span class="line">        <span class="keyword">return</span> descendantQueuedQueries + queuedQueries.size() &lt; maxQueuedQueries;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>descendantQueuedQueries</code> 表示 subGroup 当前排队的查询数，这里该方法完整的含义表示：subGroup 和当前组排队中的查询数之和，不能超过当前组配置的最大查询数</p>
+<h3 id="canRunMore"><a href="#canRunMore" class="headerlink" title="canRunMore"></a>canRunMore</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">boolean</span> <span class="title">canRunMore</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    checkState(Thread.holdsLock(root), <span class="string">"Must hold lock"</span>);</span><br><span class="line">    <span class="keyword">synchronized</span> (root) &#123;</span><br><span class="line">        <span class="keyword">if</span> (cpuUsageMillis &gt;= hardCpuLimitMillis) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="keyword">false</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">int</span> hardConcurrencyLimit = <span class="keyword">this</span>.hardConcurrencyLimit;</span><br><span class="line">        <span class="keyword">if</span> (cpuUsageMillis &gt;= softCpuLimitMillis) &#123;</span><br><span class="line">            <span class="comment">// <span class="doctag">TODO:</span> Consider whether cpu limit math should be performed on softConcurrency or hardConcurrency</span></span><br><span class="line">            <span class="comment">// Linear penalty between soft and hard limit</span></span><br><span class="line">            <span class="keyword">double</span> penalty = (cpuUsageMillis - softCpuLimitMillis) / (<span class="keyword">double</span>) (hardCpuLimitMillis - softCpuLimitMillis;</span><br><span class="line">            hardConcurrencyLimit = (<span class="keyword">int</span>) Math.floor(hardConcurrencyLimit * (<span class="number">1</span> - penalty));</span><br><span class="line">            <span class="comment">// Always penalize by at least one</span></span><br><span class="line">            hardConcurrencyLimit = min(<span class="keyword">this</span>.hardConcurrencyLimit - <span class="number">1</span>, hardConcurrencyLimit);</span><br><span class="line">            <span class="comment">// Always allow at least one running query</span></span><br><span class="line">            hardConcurrencyLimit = Math.max(<span class="number">1</span>, hardConcurrencyLimit);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> runningQueries.size() + descendantRunningQueries &lt; hardConcurrencyLimit &amp;&amp;</span><br><span class="line">                cachedMemoryUsageBytes &lt;= softMemoryLimitBytes;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这段逻辑主要有两个概念需要注意的，<code>hard</code> 和 <code>soft</code> 配置，可以理解为 <code>hard</code> 是硬性限制，不允许超过该设置，<code>soft</code> 是软性限制，允许一定程度的过载</p>
+<p>这里举个例子</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">hardCpu=10000ms</span><br><span class="line">softCpu=8000ms</span><br><span class="line">hardConcurrency=100</span><br><span class="line"></span><br><span class="line">cpuUsage=9000ms</span><br></pre></td></tr></table></figure>
+<ul>
+<li>如果当前组已经累计cpu耗时超过 <code>hardCpuLimitMillis</code> 限制，直接不允许执行</li>
+<li>在没有超过 <code>hardCpuLimitMillis</code> 后，但是超过 <code>softCpuLimitMillis</code> 时，这里有点复杂，可以根据例子来计算下<ol>
+<li>先计算超出 <code>softCpu</code> 的比例，<code>double penalty = (cpuUsageMillis - softCpuLimitMillis) / (double) (hardCpuLimitMillis - softCpuLimitMillis)</code>，根据上面的例子 penalty=0.5</li>
+<li>根据超出的比例，调整并发上限（资源已经超用了，要根据超用情况降低并发上限），hardConcurrencyLimit=100*0.5=50</li>
+<li>最终并发上限调整为50（这里 min, max 是为了保证至少允许一个查询执行）</li>
+</ol>
+</li>
+<li>最终表达式 <code>runningQueries.size() + descendantRunningQueries &lt; hardConcurrencyLimit &amp;&amp; cachedMemoryUsageBytes &lt;= softMemoryLimitBytes</code>，正在运行的查询数（包括 subGroup ）小于并发限制，且内存使用量小于设置的内存资源上限</li>
+</ul>
+<p>其实 presto 资源的隔离限制，主要是从下面这几个维度进行控制</p>
+<h4 id="并发"><a href="#并发" class="headerlink" title="并发"></a>并发</h4><p>关于并发，主要是 <code>hardConcurrencyLimit</code>，<code>runningQueries.size() + descendantRunningQueries &lt; hardConcurrencyLimit</code> 这段逻辑进行了并发限制</p>
+<h4 id="CPU"><a href="#CPU" class="headerlink" title="CPU"></a>CPU</h4><p>CPU 主要对在该组内执行的 sql 消耗的 cpu 时间 <code>cpuUsageMillis</code> 进行累加，然后进行判断达到上限 <code>hardCpuLimitMilli</code>，该值默认是 Long.MAX_VALUE。这里有个问题：随着运行的 sql 越来越多，如果一直累加 <code>cpuUsageMillis</code>，岂不是很容易就超过 <code>hardCpuLimitMilli</code> ？（继续阅读源码，发现 group 会定时执行生成 cpu 时间片的逻辑，模拟释放 cpu 资源的逻辑，这里就会定时减少 <code>cpuUsageMillis</code>，保证不会无限增长），代码如下</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title">internalGenerateCpuQuota</span><span class="params">(<span class="keyword">long</span> elapsedSeconds)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    checkState(Thread.holdsLock(root), <span class="string">"Must hold lock to generate cpu quota"</span>);</span><br><span class="line">    <span class="keyword">synchronized</span> (root) &#123;</span><br><span class="line">        <span class="keyword">long</span> newQuota;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            newQuota = Math.multiplyExact(elapsedSeconds, cpuQuotaGenerationMillisPerSecond);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">catch</span> (ArithmeticException e) &#123;</span><br><span class="line">            newQuota = Long.MAX_VALUE;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            cpuUsageMillis = Math.subtractExact(cpuUsageMillis, newQuota);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">catch</span> (ArithmeticException e) &#123;</span><br><span class="line">            cpuUsageMillis = <span class="number">0</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        cpuUsageMillis = Math.max(<span class="number">0</span>, cpuUsageMillis);</span><br><span class="line">        <span class="keyword">for</span> (InternalResourceGroup group : subGroups.values()) &#123;</span><br><span class="line">            group.internalGenerateCpuQuota(elapsedSeconds);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="内存"><a href="#内存" class="headerlink" title="内存"></a>内存</h4><p><code>cachedMemoryUsageBytes &lt;= softMemoryLimitBytes</code> 这段描述了 group 内存使用控制，主要看下 presto 是如何记录 <code>cachedMemoryUsageBytes</code> 的</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Memory usage stats are expensive to maintain, so this method must be called periodically to update them</span></span><br><span class="line"><span class="function"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title">internalRefreshStats</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    checkState(Thread.holdsLock(root), <span class="string">"Must hold lock to refresh stats"</span>);</span><br><span class="line">    <span class="keyword">synchronized</span> (root) &#123;</span><br><span class="line">        <span class="keyword">if</span> (subGroups.isEmpty()) &#123;</span><br><span class="line">            cachedMemoryUsageBytes = <span class="number">0</span>;</span><br><span class="line">            <span class="keyword">for</span> (QueryExecution query : runningQueries) &#123;</span><br><span class="line">                cachedMemoryUsageBytes += query.getTotalMemoryReservation();</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">else</span> &#123;</span><br><span class="line">            <span class="keyword">for</span> (Iterator&lt;InternalResourceGroup&gt; iterator = dirtySubGroups.iterator(); iterator.hasNext(); ) &#123;</span><br><span class="line">                InternalResourceGroup subGroup = iterator.next();</span><br><span class="line">                <span class="keyword">long</span> oldMemoryUsageBytes = subGroup.cachedMemoryUsageBytes;</span><br><span class="line">                cachedMemoryUsageBytes -= oldMemoryUsageBytes;</span><br><span class="line">                subGroup.internalRefreshStats();</span><br><span class="line">                cachedMemoryUsageBytes += subGroup.cachedMemoryUsageBytes;</span><br><span class="line">                <span class="keyword">if</span> (!subGroup.isDirty()) &#123;</span><br><span class="line">                    iterator.remove();</span><br><span class="line">                &#125;</span><br><span class="line">                <span class="keyword">if</span> (oldMemoryUsageBytes != subGroup.cachedMemoryUsageBytes) &#123;</span><br><span class="line">                    subGroup.updateEligiblility();</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>作者的注释：记录内存使用情况的维护成本高，因此只能定时调用该方法来更新</p>
+<p>所以这段方法最重要的一行就是 <code>cachedMemoryUsageBytes += query.getTotalMemoryReservation();</code> 获取当前组所有运行的 sql，累加他们已申请的内存量。</p>
+<p>阅读源码发现，系统的刷新频率为1ms一次</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>Resource Group 还支持一些其他的资源控制，比如队列长度、排队时长、运行时长、调度策略等，以上是我认为比较核心的配置，掌握这些配置的原理，结合生产环境的实际情况，可以更好的设计队列拆分规则。</p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+      <div>
+        <div style="padding: 10px 0; margin: 20px auto; width: 90%; text-align: center;">
+  <div>喜欢我的文章的人，可以自愿付费。</div>
+  <button id="rewardButton" disable="enable" onclick="var qr = document.getElementById('QR'); if (qr.style.display === 'none') {qr.style.display='block';} else {qr.style.display='none'}">
+    <span>打赏</span>
+  </button>
+  <div id="QR" style="display: none;">
+
+    
+      <div id="wechat" style="display: inline-block">
+        <img id="wechat_qr" src="/images/wechatPay.jpeg" alt="大班 微信支付">
+        <p>微信支付</p>
+      </div>
+    
+
+    
+      <div id="alipay" style="display: inline-block">
+        <img id="alipay_qr" src="/images/aliPay.jpeg" alt="大班 支付宝">
+        <p>支付宝</p>
+      </div>
+    
+
+    
+
+  </div>
+</div>
+
+      </div>
+    
+
+    
+      <div>
+        <ul class="post-copyright">
+  <li class="post-copyright-author">
+    <strong>本文作者：</strong>
+    大班
+  </li>
+  <li class="post-copyright-link">
+    <strong>本文链接：</strong>
+    <a href="http://www.datapoilt.com/2019/04/16/presto-src-rsgroup/" title="presto 源码分析 - Resource Group">http://www.datapoilt.com/2019/04/16/presto-src-rsgroup/</a>
+  </li>
+  <li class="post-copyright-license">
+    <strong>版权声明： </strong>
+    本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/3.0/" rel="external nofollow" target="_blank">CC BY-NC-SA 3.0</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+
+      </div>
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/presto/" rel="tag"># presto</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/01/22/spark-sql-streaming-performance-profile/" rel="next" title="Spark Structured Streaming 性能诊断">
+                <i class="fa fa-chevron-left"></i> Spark Structured Streaming 性能诊断
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2019/10/10/tech-share-presto-scheduler/" rel="prev" title="presto 查询调度">
+                presto 查询调度 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+        
+  <div class="bdsharebuttonbox">
+    <a href="#" class="bds_tsina" data-cmd="tsina" title="分享到新浪微博"></a>
+    <a href="#" class="bds_douban" data-cmd="douban" title="分享到豆瓣网"></a>
+    <a href="#" class="bds_sqq" data-cmd="sqq" title="分享到QQ好友"></a>
+    <a href="#" class="bds_qzone" data-cmd="qzone" title="分享到QQ空间"></a>
+    <a href="#" class="bds_weixin" data-cmd="weixin" title="分享到微信"></a>
+    <a href="#" class="bds_tieba" data-cmd="tieba" title="分享到百度贴吧"></a>
+    <a href="#" class="bds_twi" data-cmd="twi" title="分享到Twitter"></a>
+    <a href="#" class="bds_fbook" data-cmd="fbook" title="分享到Facebook"></a>
+    <a href="#" class="bds_more" data-cmd="more"></a>
+    <a class="bds_count" data-cmd="count"></a>
+  </div>
+  <script>
+    window._bd_share_config = {
+      "common": {
+        "bdText": "",
+        "bdMini": "2",
+        "bdMiniList": false,
+        "bdPic": ""
+      },
+      "share": {
+        "bdSize": "16",
+        "bdStyle": "0"
+      },
+      "image": {
+        "viewList": ["tsina", "douban", "sqq", "qzone", "weixin", "twi", "fbook"],
+        "viewText": "分享到：",
+        "viewSize": "16"
+      }
+    }
+  </script>
+
+<script>
+  with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='//bdimg.share.baidu.com/static/api/js/share.js?cdnversion='+~(-new Date()/36e5)];
+</script>
+
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+      
+        <div id="gitment-container"></div>
+      
+    </div>
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">大班</p>
+              <p class="site-description motion-element" itemprop="description">专注分布式计算与存储、大数据平台，数据分析等技术</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">16</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">10</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#开启资源组功能"><span class="nav-number">1.</span> <span class="nav-text">开启资源组功能</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#query-匹配所属的资源组"><span class="nav-number">2.</span> <span class="nav-text">query 匹配所属的资源组</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#查询执行"><span class="nav-number">3.</span> <span class="nav-text">查询执行</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#canQueueMore"><span class="nav-number">3.1.</span> <span class="nav-text">canQueueMore</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#canRunMore"><span class="nav-number">3.2.</span> <span class="nav-text">canRunMore</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#并发"><span class="nav-number">3.2.1.</span> <span class="nav-text">并发</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#CPU"><span class="nav-number">3.2.2.</span> <span class="nav-text">CPU</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#内存"><span class="nav-number">3.2.3.</span> <span class="nav-text">内存</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#总结"><span class="nav-number">4.</span> <span class="nav-text">总结</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">大班</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Gemini</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=5.1.4"></script>
+
+
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+<!-- LOCAL: You can save these files to your site and update links -->
+    
+        
+        <link rel="stylesheet" href="https://aimingoo.github.io/gitmint/style/default.css">
+        <script src="https://aimingoo.github.io/gitmint/dist/gitmint.browser.js"></script>
+    
+<!-- END LOCAL -->
+
+    
+      <style>
+        a.gitment-editor-footer-tip { display: none; }
+        .gitment-container.gitment-footer-container { display: none; }
+      </style>
+    
+
+    
+      <script type="text/javascript">
+      function renderGitment(){
+        var gitment = new Gitmint({
+            id: '1555381979000', 
+            owner: 'huanchuanjian',
+            repo: 'huanchuanjian.github.com',
+            
+            lang: "" || navigator.language || navigator.systemLanguage || navigator.userLanguage,
+            
+            oauth: {
+            
+            
+                client_secret: '18a31a547ca6f793f10d80ff009d8a364d9dba96',
+            
+                client_id: 'a10b0b0b0b127ee83d42'
+            }});
+        gitment.render('gitment-container');
+      }
+
+      
+      renderGitment();
+      
+      </script>
+    
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
