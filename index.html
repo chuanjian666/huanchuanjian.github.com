@@ -263,7 +263,7 @@
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://www.datapoilt.com/2021/12/04/presto-writer/">
+    <link itemprop="mainEntityOfPage" href="http://www.datapoilt.com/2022/01/20/clickhouse-projection-test/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="name" content="大班">
@@ -282,7 +282,7 @@
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2021/12/04/presto-writer/" itemprop="url">presto-writer</a></h1>
+                <a class="post-title-link" href="/2022/01/20/clickhouse-projection-test/" itemprop="url">ClickHouse Projection 测试</a></h1>
         
 
         <div class="post-meta">
@@ -294,8 +294,8 @@
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2021-12-04T22:09:33+08:00">
-                2021-12-04
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2022-01-20T21:39:02+08:00">
+                2022-01-20
               </time>
             
 
@@ -333,128 +333,23 @@
 
       
         
-          
-            
-          
-        
-      
-    </div>
-    
-    
-    
-
-    
-
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://www.datapoilt.com/2021/10/15/olap-codegen/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="大班">
-      <meta itemprop="description" content>
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DataPilot">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2021/10/15/olap-codegen/" itemprop="url">OLAP 代码生成技术</a></h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">发表于</span>
-              
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2021-10-15T16:58:42+08:00">
-                2021-10-15
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-
-          
-            
-          
-
-          
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-            
-          
+          <p>Projection 是 ClickHouse 21 版本中非常重要的特性之一。</p>
+<p>虽然社区的迭代节奏很快，但是我们以生产环境保障用户稳定使用为核心，每年最多安排一次升级，每次升级在版本兼容性、稳定性、性能等方面都会做详细的调研测试，包括最终生产的灰度、回滚等都做好预案，保证每次升级都在可控范围内。</p>
+<p>目前生产环境使用的是 20.8 LTS 版本，本次测试 Projection 选用的是 21.8 LTS 版本。下面记录下测试过程：</p>
+<h4 id="Projection-简介"><a href="#Projection-简介" class="headerlink" title="Projection 简介"></a>Projection 简介</h4><p>Projection 主要解决 ClickHouse 使用过程中的以下痛点：</p>
+<ul>
+<li><p>仅支持一种排序方式，例如 ORDER BY (prov_id, city_id)，查询时却无法享受 ORDER BY (city_id) 的优化</p>
+</li>
+<li><p>物化视图也支持预计算，但是创建后，需要用户修改 SQL；并且当未命中预计算结果时，无法下推到明细数据查询，灵活性和用户体验较差</p>
+</li>
+</ul>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2022/01/20/clickhouse-projection-test/#more" rel="contents">
+              阅读全文 &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
         
       
     </div>
@@ -520,7 +415,7 @@
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2021/09/04/olap-vectorized-execution/" itemprop="url">OLAP 向量化执行引擎</a></h1>
+                <a class="post-title-link" href="/2021/09/04/olap-vectorized-execution/" itemprop="url">OLAP 向量化执行</a></h1>
         
 
         <div class="post-meta">
@@ -534,125 +429,6 @@
               
               <time title="创建于" itemprop="dateCreated datePublished" datetime="2021-09-04T16:59:46+08:00">
                 2021-09-04
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-
-          
-            
-          
-
-          
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-            
-          
-        
-      
-    </div>
-    
-    
-    
-
-    
-
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://www.datapoilt.com/2021/06/25/presto-orc-tuning/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="大班">
-      <meta itemprop="description" content>
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DataPilot">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2021/06/25/presto-orc-tuning/" itemprop="url">Presto ORC 表调优</a></h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">发表于</span>
-              
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2021-06-25T14:39:11+08:00">
-                2021-06-25
               </time>
             
 
@@ -758,7 +534,7 @@
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2021/02/16/clickhouse-test/" itemprop="url">clickhouse 测试记录</a></h1>
+                <a class="post-title-link" href="/2021/02/16/clickhouse-test/" itemprop="url">ClickHouse 测试记录</a></h1>
         
 
         <div class="post-meta">
@@ -810,6 +586,11 @@
       
         
           <p>以下是使用 clickhouse 过程中做的一些对比测试，提出假设、设计实验、验证结果，做完拿到数据加深了印象，纠正一些错误的观念，才能在实际业务场景中灵活运用。</p>
+<h4 id="批量写入同一个分区和不同分区"><a href="#批量写入同一个分区和不同分区" class="headerlink" title="批量写入同一个分区和不同分区"></a>批量写入同一个分区和不同分区</h4><ul>
+<li>假设：一个批次的数据包含多个分区，写入时会产生多个 parts，影响写入效率</li>
+<li>结论：不同分区较相同分区，性能相差约 40%</li>
+</ul>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> db_test.t_insert_multi_partitions(</span><br><span class="line">  <span class="keyword">id</span>    UInt32,</span><br><span class="line">  msg   <span class="keyword">String</span>,</span><br><span class="line">  ds    DateTime</span><br><span class="line">)</span><br><span class="line"><span class="keyword">ENGINE</span> = MergeTree()</span><br><span class="line"><span class="keyword">PARTITION</span> <span class="keyword">BY</span> toYYYYMMDD(ds)</span><br><span class="line"><span class="keyword">ORDER</span> <span class="keyword">BY</span> (<span class="keyword">id</span>);</span><br><span class="line"> </span><br><span class="line"><span class="comment">-- 随机写入10个分区</span></span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> db_test.t_insert_multi_partitions (<span class="keyword">id</span>, msg, ds) <span class="keyword">SELECT</span></span><br><span class="line">    <span class="number">1</span> <span class="keyword">AS</span> <span class="keyword">id</span>,</span><br><span class="line">    <span class="string">'foobar'</span> <span class="keyword">AS</span> msg,</span><br><span class="line">    toDateTime(<span class="string">'2020-01-01 00:00:00'</span>) + (<span class="keyword">rand</span>(<span class="number">2</span>) % ((<span class="number">3600</span> * <span class="number">24</span>) * <span class="number">10</span>)) <span class="keyword">AS</span> ds</span><br><span class="line"><span class="keyword">FROM</span> numbers(<span class="number">100000000</span>)</span><br><span class="line"> </span><br><span class="line">Ok.</span><br><span class="line"> </span><br><span class="line"><span class="number">0</span> <span class="keyword">rows</span> <span class="keyword">in</span> set. Elapsed: <span class="number">7.436</span> sec. Processed <span class="number">100.66</span> million <span class="keyword">rows</span>, <span class="number">805.28</span> MB (<span class="number">13.54</span> million <span class="keyword">rows</span>/s., <span class="number">108.30</span> MB/s.)</span><br><span class="line"> </span><br><span class="line"><span class="comment">-- 写入单个分区</span></span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> db_test.t_insert_multi_partitions (<span class="keyword">id</span>, msg, ds) <span class="keyword">SELECT</span></span><br><span class="line">    <span class="number">1</span> <span class="keyword">AS</span> <span class="keyword">id</span>,</span><br><span class="line">    <span class="string">'foobar'</span> <span class="keyword">AS</span> msg,</span><br><span class="line">    toDateTime(<span class="string">'2020-03-01 00:00:00'</span>)</span><br><span class="line"><span class="keyword">FROM</span> numbers(<span class="number">100000000</span>)</span><br><span class="line"> </span><br><span class="line">Ok.</span><br><span class="line"> </span><br><span class="line"><span class="number">0</span> <span class="keyword">rows</span> <span class="keyword">in</span> set. Elapsed: <span class="number">4.491</span> sec. Processed <span class="number">100.66</span> million <span class="keyword">rows</span>, <span class="number">805.28</span> MB (<span class="number">22.41</span> million <span class="keyword">rows</span>/s., <span class="number">179.32</span> MB/s.)</span><br></pre></td></tr></table></figure>
           <!--noindex-->
           <div class="post-button text-center">
             <a class="btn" href="/2021/02/16/clickhouse-test/#more" rel="contents">
@@ -1479,6 +1260,257 @@
 
 
     
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://www.datapoilt.com/2019/01/22/spark-sql-streaming-performance-profile/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="大班">
+      <meta itemprop="description" content>
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DataPilot">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+                
+                <a class="post-title-link" href="/2019/01/22/spark-sql-streaming-performance-profile/" itemprop="url">Spark Structured Streaming 性能诊断</a></h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-01-22T10:18:10+08:00">
+                2019-01-22
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>最近组内同事和我反馈，我提交到集群上的一个实时计算 Job 资源占用较高，而该 Job 处理数据量不大，所以怀疑有性能问题。</p>
+<p>打开 Spark 应用监控后台如下图：</p>
+<img src="/2019/01/22/spark-sql-streaming-performance-profile/streaming-job-ui.png" title="spark-job-ui">
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2019/01/22/spark-sql-streaming-performance-profile/#more" rel="contents">
+              阅读全文 &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://www.datapoilt.com/2018/11/23/flume-kafka-to-hdfs/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="大班">
+      <meta itemprop="description" content>
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DataPilot">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+                
+                <a class="post-title-link" href="/2018/11/23/flume-kafka-to-hdfs/" itemprop="url">使用 Flume 消费 Kafka 数据到 HDFS</a></h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2018-11-23T13:59:49+08:00">
+                2018-11-23
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>最近使用 Flume 消费 Kafka 数据到 HDFS 上，本文记录下使用过程一些注意点，处理数据格式如下：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">	<span class="attr">"ver"</span>: <span class="number">1</span>,</span><br><span class="line">	<span class="attr">"type"</span>: <span class="number">101</span>,</span><br><span class="line">	<span class="attr">"env"</span>: <span class="number">1</span>,</span><br><span class="line">	<span class="attr">"partnerId"</span>: <span class="string">"6763ca7f-bc55-4021-8817-d3f529754b20"</span>,</span><br><span class="line">	<span class="attr">"ctime"</span>: <span class="string">"2018-09-09 12:23:10"</span>,</span><br><span class="line">	<span class="attr">"fpath"</span>: <span class="string">"xxxx"</span>,</span><br><span class="line">	<span class="attr">"isAnalysis"</span>: <span class="number">0</span>,</span><br><span class="line">	<span class="attr">"eventId"</span>: <span class="string">"121194142179082755"</span>,</span><br><span class="line">	<span class="attr">"data"</span>: <span class="string">""</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2018/11/23/flume-kafka-to-hdfs/#more" rel="contents">
+              阅读全文 &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+    
   </section>
 
   
@@ -1529,7 +1561,7 @@
               
                 <a href="/archives/">
               
-                  <span class="site-state-item-count">16</span>
+                  <span class="site-state-item-count">14</span>
                   <span class="site-state-item-name">日志</span>
                 </a>
               </div>
@@ -1542,7 +1574,7 @@
               
               <div class="site-state-item site-state-tags">
                 
-                  <span class="site-state-item-count">10</span>
+                  <span class="site-state-item-count">9</span>
                   <span class="site-state-item-name">标签</span>
                 
               </div>

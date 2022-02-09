@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next gemini use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.9.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="clickhouse,">
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="Projection 是 ClickHouse 21 版本中非常重要的特性之一。 虽然社区的迭代节奏很快，但是我们以生产环境保障用户稳定使用为核心，每年最多安排一次升级，每次升级在版本兼容性、稳定性、性能等方面都会做详细的调研测试，包括最终生产的灰度、回滚等都做好预案，保证每次升级都在可控范围内。 目前生产环境使用的是 20.8 LTS 版本，本次测试 Projection 选用的是 21.8 L">
+<meta name="keywords" content="clickhouse">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ClickHouse Projection 测试">
+<meta property="og:url" content="http://www.datapoilt.com/2022/01/20/clickhouse-projection-test/index.html">
+<meta property="og:site_name" content="DataPilot">
+<meta property="og:description" content="Projection 是 ClickHouse 21 版本中非常重要的特性之一。 虽然社区的迭代节奏很快，但是我们以生产环境保障用户稳定使用为核心，每年最多安排一次升级，每次升级在版本兼容性、稳定性、性能等方面都会做详细的调研测试，包括最终生产的灰度、回滚等都做好预案，保证每次升级都在可控范围内。 目前生产环境使用的是 20.8 LTS 版本，本次测试 Projection 选用的是 21.8 L">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:updated_time" content="2022-02-09T02:39:25.037Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="ClickHouse Projection 测试">
+<meta name="twitter:description" content="Projection 是 ClickHouse 21 版本中非常重要的特性之一。 虽然社区的迭代节奏很快，但是我们以生产环境保障用户稳定使用为核心，每年最多安排一次升级，每次升级在版本兼容性、稳定性、性能等方面都会做详细的调研测试，包括最终生产的灰度、回滚等都做好预案，保证每次升级都在可控范围内。 目前生产环境使用的是 20.8 LTS 版本，本次测试 Projection 选用的是 21.8 L">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Gemini',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://www.datapoilt.com/2022/01/20/clickhouse-projection-test/">
+
+
+
+
+
+  <title>ClickHouse Projection 测试 | DataPilot</title>
+  
+
+
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?bb11f660ec32a7207f07af91515d39ba";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">DataPilot</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle"></p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br>
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://www.datapoilt.com/2022/01/20/clickhouse-projection-test/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="大班">
+      <meta itemprop="description" content>
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DataPilot">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">ClickHouse Projection 测试</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2022-01-20T21:39:02+08:00">
+                2022-01-20
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2022/01/20/clickhouse-projection-test/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count gitment-comments-count" data-xid="/2022/01/20/clickhouse-projection-test/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>Projection 是 ClickHouse 21 版本中非常重要的特性之一。</p>
+<p>虽然社区的迭代节奏很快，但是我们以生产环境保障用户稳定使用为核心，每年最多安排一次升级，每次升级在版本兼容性、稳定性、性能等方面都会做详细的调研测试，包括最终生产的灰度、回滚等都做好预案，保证每次升级都在可控范围内。</p>
+<p>目前生产环境使用的是 20.8 LTS 版本，本次测试 Projection 选用的是 21.8 LTS 版本。下面记录下测试过程：</p>
+<h4 id="Projection-简介"><a href="#Projection-简介" class="headerlink" title="Projection 简介"></a>Projection 简介</h4><p>Projection 主要解决 ClickHouse 使用过程中的以下痛点：</p>
+<ul>
+<li><p>仅支持一种排序方式，例如 ORDER BY (prov_id, city_id)，查询时却无法享受 ORDER BY (city_id) 的优化</p>
+</li>
+<li><p>物化视图也支持预计算，但是创建后，需要用户修改 SQL；并且当未命中预计算结果时，无法下推到明细数据查询，灵活性和用户体验较差</p>
+</li>
+</ul>
+<a id="more"></a>
+<h4 id="开启关闭-Projection-功能"><a href="#开启关闭-Projection-功能" class="headerlink" title="开启关闭 Projection 功能"></a>开启关闭 Projection 功能</h4><p>目前 Projection 功能需要通过 session 参数开启</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- tips: 在做对比测试时，可以使用该参数开启关闭</span></span><br><span class="line"><span class="keyword">SET</span> allow_experimental_projection_optimization = <span class="number">1</span>;</span><br></pre></td></tr></table></figure>
+<h4 id="创建-Projection"><a href="#创建-Projection" class="headerlink" title="创建 Projection"></a>创建 Projection</h4><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- 注意 select 子句没有 from，表名等</span></span><br><span class="line"><span class="keyword">ALTER</span> <span class="keyword">TABLE</span> db_hive_st.t_st_bill_line_weightrange_detail_projection_local　    </span><br><span class="line"><span class="keyword">ADD</span> PROJECTION proj_bill_line_detail_startprov_endprov　    </span><br><span class="line">(　        </span><br><span class="line">  <span class="keyword">select</span> start_province, end_province, <span class="keyword">count</span>(<span class="number">1</span>) <span class="keyword">group</span> <span class="keyword">by</span> start_province, end_province　    </span><br><span class="line">);</span><br></pre></td></tr></table></figure>
+<h4 id="查看是否命中-Projection"><a href="#查看是否命中-Projection" class="headerlink" title="查看是否命中 Projection"></a>查看是否命中 Projection</h4><p>使用 <code>EXPLAIN actions=1 + SQL</code>，如果在执行计划中看到 <code>ReadFromStorage (MergeTree(with 1 projection proj_bill_line_detail_startprov_endprov))</code> 类似这样的结果，说明命中了 Projection</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">HZPL004139058 :) EXPLAIN actions=1 select start_province, end_province, count(1) from db_hive_st.t_st_bill_line_weightrange_detail_projection_local group by start_province, end_province;</span><br><span class="line"></span><br><span class="line">EXPLAIN actions = 1</span><br><span class="line">SELECT </span><br><span class="line">    start_province,</span><br><span class="line">    end_province,</span><br><span class="line">    count(1)</span><br><span class="line">FROM db_hive_st.t_st_bill_line_weightrange_detail_projection_local</span><br><span class="line">GROUP BY </span><br><span class="line">    start_province,</span><br><span class="line">    end_province</span><br><span class="line"></span><br><span class="line">┌─explain────────────────────────────────────────────────────────────────────────────────────┐</span><br><span class="line">│ Expression ((Projection + Before ORDER BY))                                                │</span><br><span class="line">│ Actions: INPUT :: 0 -&gt; start_province LowCardinality(String) : 0                           │</span><br><span class="line">│          INPUT :: 1 -&gt; end_province LowCardinality(String) : 1                             │</span><br><span class="line">│          INPUT :: 2 -&gt; count() UInt64 : 2                                                  │</span><br><span class="line">│ Positions: 0 1 2                                                                           │</span><br><span class="line">│   SettingQuotaAndLimits (Set limits and quota after reading from storage)                  │</span><br><span class="line">│     ReadFromStorage (MergeTree(with 1 projection proj_bill_line_detail_startprov_endprov)) │</span><br><span class="line">└────────────────────────────────────────────────────────────────────────────────────────────┘</span><br><span class="line"></span><br><span class="line">7 rows in set. Elapsed: 0.019 sec.</span><br></pre></td></tr></table></figure>
+<h4 id="手动触发-Projection"><a href="#手动触发-Projection" class="headerlink" title="手动触发 Projection"></a>手动触发 Projection</h4><p>默认情况下，在创建 Projection 后，ClickHouse 仅会对新写入的数据进行构建。历史数据目前只能手动生成。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">ALTER</span> <span class="keyword">TABLE</span> db_hive_st.t_st_bill_line_weightrange_detail_projection_local </span><br><span class="line">MATERIALIZE PROJECTION proj_bill_line_detail_startprov_endprov</span><br></pre></td></tr></table></figure>
+<h4 id="性能对比"><a href="#性能对比" class="headerlink" title="性能对比"></a>性能对比</h4><p>这里我们测试集约5亿条数据，使用 Projection 后性能提升还是非常明显的，大约 30倍</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- 命中前</span></span><br><span class="line">1052 rows in set. Elapsed: <span class="number">1.170</span> sec. Processed <span class="number">509.47</span> million <span class="keyword">rows</span>, <span class="number">1.03</span> GB (<span class="number">435.37</span> million <span class="keyword">rows</span>/s., <span class="number">881.48</span> MB/s.</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 命中 projection 后</span></span><br><span class="line"><span class="number">1052</span> <span class="keyword">rows</span> <span class="keyword">in</span> set. Elapsed: <span class="number">0.040</span> sec. Processed <span class="number">243.74</span> thousand <span class="keyword">rows</span>, <span class="number">5.74</span> MB (<span class="number">6.06</span> million <span class="keyword">rows</span>/s., <span class="number">142.67</span> MB/s.)</span><br></pre></td></tr></table></figure>
+<h4 id="存储开销"><a href="#存储开销" class="headerlink" title="存储开销"></a>存储开销</h4><p>Projection 优化核心还是基于预计算，用空间换时间，那么具体的开销是多少，这里也可以通过系统表查看</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="keyword">SELECT</span> </span><br><span class="line">    <span class="keyword">name</span>,</span><br><span class="line">    <span class="keyword">partition</span>,</span><br><span class="line">    formatReadableSize(<span class="keyword">sum</span>(bytes_on_disk)) <span class="keyword">AS</span> <span class="keyword">bytes</span>,</span><br><span class="line">    formatReadableSize(<span class="keyword">sum</span>(parent_bytes_on_disk)) <span class="keyword">AS</span> parent_bytes,</span><br><span class="line">    <span class="keyword">sum</span>(<span class="keyword">rows</span>) <span class="keyword">AS</span> rows_sum,</span><br><span class="line">    <span class="keyword">sum</span>(parent_rows) <span class="keyword">AS</span> parent_rows_sum,</span><br><span class="line">    rows_sum / parent_rows_sum <span class="keyword">AS</span> rows_ratio,</span><br><span class="line">    <span class="keyword">sum</span>(bytes_on_disk) / <span class="keyword">sum</span>(parent_bytes_on_disk) <span class="keyword">AS</span> storage_ratio</span><br><span class="line"><span class="keyword">FROM</span> system.projection_parts</span><br><span class="line"><span class="keyword">GROUP</span> <span class="keyword">BY</span> </span><br><span class="line">    <span class="keyword">name</span>,</span><br><span class="line">    <span class="keyword">partition</span></span><br><span class="line"><span class="keyword">ORDER</span> <span class="keyword">BY</span> <span class="keyword">partition</span> <span class="keyword">ASC</span></span><br><span class="line"></span><br><span class="line">┌─<span class="keyword">name</span>────────────────────────────────────┬─<span class="keyword">partition</span>─┬─<span class="keyword">bytes</span>─────┬─parent_bytes─┬─rows_sum─┬─parent_rows_sum─┬──────────────rows_ratio─┬─────────storage_ratio─┐</span><br><span class="line">│ proj_bill_line_detail_startprov_endprov │ <span class="number">20220115</span>  │ <span class="number">32.08</span> KiB │ <span class="number">31.42</span> GiB    │    <span class="number">12719</span> │        <span class="number">85588948</span> │  <span class="number">0.00014860563539114888</span> │   <span class="number">9.73598775714583e-7</span> │</span><br><span class="line">│ proj_bill_line_detail_startprov_endprov │ <span class="number">20220116</span>  │ <span class="number">3.52</span> KiB  │ <span class="number">33.44</span> GiB    │      <span class="number">996</span> │        <span class="number">99634652</span> │   <span class="number">0.0000099965220935383</span> │ <span class="number">1.0029992891071659e-7</span> │</span><br><span class="line">│ proj_bill_line_detail_startprov_endprov │ <span class="number">20220117</span>  │ <span class="number">9.85</span> KiB  │ <span class="number">48.01</span> GiB    │     <span class="number">3024</span> │       <span class="number">137026514</span> │ <span class="number">0.000022068721678200177</span> │ <span class="number">1.9572719358157235e-7</span> │</span><br><span class="line">│ proj_bill_line_detail_startprov_endprov │ <span class="number">20220118</span>  │ <span class="number">3.64</span> KiB  │ <span class="number">32.14</span> GiB    │     <span class="number">1029</span> │        <span class="number">94785506</span> │ <span class="number">0.000010856090170579456</span> │  <span class="number">1.078741028157229e-7</span> │</span><br><span class="line">│ proj_bill_line_detail_startprov_endprov │ <span class="number">20220119</span>  │ <span class="number">6.83</span> KiB  │ <span class="number">32.34</span> GiB    │     <span class="number">2049</span> │        <span class="number">92480299</span> │ <span class="number">0.000022156070235023786</span> │ <span class="number">2.0158015835382877e-7</span> │</span><br><span class="line">│ proj_bill_line_detail_startprov_endprov │ <span class="number">20220120</span>  │ <span class="number">23.32</span> KiB │ <span class="number">23.26</span> GiB    │    <span class="number">11540</span> │        <span class="number">63746300</span> │   <span class="number">0.0001810301146890094</span> │   <span class="number">9.56107383898372e-7</span> │</span><br><span class="line">│ proj_bill_line_detail_startprov_endprov │ <span class="number">20220121</span>  │ <span class="number">3.67</span> KiB  │ <span class="number">35.82</span> GiB    │     <span class="number">1031</span> │       <span class="number">106706842</span> │ <span class="number">0.000009661985873408192</span> │   <span class="number">9.75996193570335e-8</span> │</span><br><span class="line">│ proj_bill_line_detail_startprov_endprov │ <span class="number">20220122</span>  │ <span class="number">3.61</span> KiB  │ <span class="number">27.24</span> GiB    │     <span class="number">1028</span> │        <span class="number">80410074</span> │  <span class="number">0.00001278446777701013</span> │ <span class="number">1.2631417865439244e-7</span> │</span><br><span class="line">│ proj_bill_line_detail_startprov_endprov │ <span class="number">20220123</span>  │ <span class="number">3.64</span> KiB  │ <span class="number">41.75</span> GiB    │     <span class="number">1003</span> │       <span class="number">123154640</span> │ <span class="number">0.000008144232324498695</span> │  <span class="number">8.325141431715405e-8</span> │</span><br><span class="line">│ proj_bill_line_detail_startprov_endprov │ <span class="number">20220124</span>  │ <span class="number">3.66</span> KiB  │ <span class="number">34.91</span> GiB    │     <span class="number">1022</span> │       <span class="number">102676793</span> │  <span class="number">0.00000995356370353328</span> │  <span class="number">9.992497855347411e-8</span> │</span><br><span class="line">└─────────────────────────────────────────┴───────────┴───────────┴──────────────┴──────────┴─────────────────┴─────────────────────────┴───────────────────────┘</span><br></pre></td></tr></table></figure>
+<p>可以看到，GROUP BY 场景下，合理的使用 Projection，存储开销可以忽略不计，同时性能提升非常明显。</p>
+<h4 id="Projection-使用注意事项"><a href="#Projection-使用注意事项" class="headerlink" title="Projection 使用注意事项"></a>Projection 使用注意事项</h4><ul>
+<li><p>“高基维”谨慎使用，会导致存储开销较大</p>
+</li>
+<li><p>本次测试 Projection 主要针对 GROUP BY 场景，ORDER BY 场景在实际使用过程，存储开销较大，大量数据排序时需谨慎使用</p>
+</li>
+<li><p>目前 Projection 支持 <code>*MergeTree</code> 表引擎（包括复制表），复制功能是基于 zk 完成的</p>
+</li>
+</ul>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+      <div>
+        <div style="padding: 10px 0; margin: 20px auto; width: 90%; text-align: center;">
+  <div>喜欢我的文章的人，可以自愿付费。</div>
+  <button id="rewardButton" disable="enable" onclick="var qr = document.getElementById('QR'); if (qr.style.display === 'none') {qr.style.display='block';} else {qr.style.display='none'}">
+    <span>打赏</span>
+  </button>
+  <div id="QR" style="display: none;">
+
+    
+      <div id="wechat" style="display: inline-block">
+        <img id="wechat_qr" src="/images/wechatPay.jpeg" alt="大班 微信支付">
+        <p>微信支付</p>
+      </div>
+    
+
+    
+      <div id="alipay" style="display: inline-block">
+        <img id="alipay_qr" src="/images/aliPay.jpeg" alt="大班 支付宝">
+        <p>支付宝</p>
+      </div>
+    
+
+    
+
+  </div>
+</div>
+
+      </div>
+    
+
+    
+      <div>
+        <ul class="post-copyright">
+  <li class="post-copyright-author">
+    <strong>本文作者：</strong>
+    大班
+  </li>
+  <li class="post-copyright-link">
+    <strong>本文链接：</strong>
+    <a href="http://www.datapoilt.com/2022/01/20/clickhouse-projection-test/" title="ClickHouse Projection 测试">http://www.datapoilt.com/2022/01/20/clickhouse-projection-test/</a>
+  </li>
+  <li class="post-copyright-license">
+    <strong>版权声明： </strong>
+    本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/3.0/" rel="external nofollow" target="_blank">CC BY-NC-SA 3.0</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+
+      </div>
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/clickhouse/" rel="tag"># clickhouse</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2021/09/04/olap-vectorized-execution/" rel="next" title="OLAP 向量化执行">
+                <i class="fa fa-chevron-left"></i> OLAP 向量化执行
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+        
+  <div class="bdsharebuttonbox">
+    <a href="#" class="bds_tsina" data-cmd="tsina" title="分享到新浪微博"></a>
+    <a href="#" class="bds_douban" data-cmd="douban" title="分享到豆瓣网"></a>
+    <a href="#" class="bds_sqq" data-cmd="sqq" title="分享到QQ好友"></a>
+    <a href="#" class="bds_qzone" data-cmd="qzone" title="分享到QQ空间"></a>
+    <a href="#" class="bds_weixin" data-cmd="weixin" title="分享到微信"></a>
+    <a href="#" class="bds_tieba" data-cmd="tieba" title="分享到百度贴吧"></a>
+    <a href="#" class="bds_twi" data-cmd="twi" title="分享到Twitter"></a>
+    <a href="#" class="bds_fbook" data-cmd="fbook" title="分享到Facebook"></a>
+    <a href="#" class="bds_more" data-cmd="more"></a>
+    <a class="bds_count" data-cmd="count"></a>
+  </div>
+  <script>
+    window._bd_share_config = {
+      "common": {
+        "bdText": "",
+        "bdMini": "2",
+        "bdMiniList": false,
+        "bdPic": ""
+      },
+      "share": {
+        "bdSize": "16",
+        "bdStyle": "0"
+      },
+      "image": {
+        "viewList": ["tsina", "douban", "sqq", "qzone", "weixin", "twi", "fbook"],
+        "viewText": "分享到：",
+        "viewSize": "16"
+      }
+    }
+  </script>
+
+<script>
+  with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='//bdimg.share.baidu.com/static/api/js/share.js?cdnversion='+~(-new Date()/36e5)];
+</script>
+
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+      
+        <div id="gitment-container"></div>
+      
+    </div>
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">大班</p>
+              <p class="site-description motion-element" itemprop="description">专注分布式计算与存储、大数据平台，数据分析等技术</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">14</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">9</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#Projection-简介"><span class="nav-number">1.</span> <span class="nav-text">Projection 简介</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#开启关闭-Projection-功能"><span class="nav-number">2.</span> <span class="nav-text">开启关闭 Projection 功能</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#创建-Projection"><span class="nav-number">3.</span> <span class="nav-text">创建 Projection</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#查看是否命中-Projection"><span class="nav-number">4.</span> <span class="nav-text">查看是否命中 Projection</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#手动触发-Projection"><span class="nav-number">5.</span> <span class="nav-text">手动触发 Projection</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#性能对比"><span class="nav-number">6.</span> <span class="nav-text">性能对比</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#存储开销"><span class="nav-number">7.</span> <span class="nav-text">存储开销</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Projection-使用注意事项"><span class="nav-number">8.</span> <span class="nav-text">Projection 使用注意事项</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">大班</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Gemini</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=5.1.4"></script>
+
+
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+<!-- LOCAL: You can save these files to your site and update links -->
+    
+        
+        <link rel="stylesheet" href="https://aimingoo.github.io/gitmint/style/default.css">
+        <script src="https://aimingoo.github.io/gitmint/dist/gitmint.browser.js"></script>
+    
+<!-- END LOCAL -->
+
+    
+      <style>
+        a.gitment-editor-footer-tip { display: none; }
+        .gitment-container.gitment-footer-container { display: none; }
+      </style>
+    
+
+    
+      <script type="text/javascript">
+      function renderGitment(){
+        var gitment = new Gitmint({
+            id: '1642685942000', 
+            owner: 'huanchuanjian',
+            repo: 'huanchuanjian.github.com',
+            
+            lang: "" || navigator.language || navigator.systemLanguage || navigator.userLanguage,
+            
+            oauth: {
+            
+            
+                client_secret: '18a31a547ca6f793f10d80ff009d8a364d9dba96',
+            
+                client_id: 'a10b0b0b0b127ee83d42'
+            }});
+        gitment.render('gitment-container');
+      }
+
+      
+      renderGitment();
+      
+      </script>
+    
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

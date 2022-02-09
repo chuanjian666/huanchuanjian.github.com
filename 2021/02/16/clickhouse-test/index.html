@@ -79,18 +79,18 @@
 
 
 
-<meta name="description" content="以下是使用 clickhouse 过程中做的一些对比测试，提出假设、设计实验、验证结果，做完拿到数据加深了印象，纠正一些错误的观念，才能在实际业务场景中灵活运用。">
+<meta name="description" content="以下是使用 clickhouse 过程中做的一些对比测试，提出假设、设计实验、验证结果，做完拿到数据加深了印象，纠正一些错误的观念，才能在实际业务场景中灵活运用。 批量写入同一个分区和不同分区 假设：一个批次的数据包含多个分区，写入时会产生多个 parts，影响写入效率 结论：不同分区较相同分区，性能相差约 40%  1234567891011121314151617181920212223242">
 <meta name="keywords" content="clickhouse">
 <meta property="og:type" content="article">
-<meta property="og:title" content="clickhouse 测试记录">
+<meta property="og:title" content="ClickHouse 测试记录">
 <meta property="og:url" content="http://www.datapoilt.com/2021/02/16/clickhouse-test/index.html">
 <meta property="og:site_name" content="DataPilot">
-<meta property="og:description" content="以下是使用 clickhouse 过程中做的一些对比测试，提出假设、设计实验、验证结果，做完拿到数据加深了印象，纠正一些错误的观念，才能在实际业务场景中灵活运用。">
+<meta property="og:description" content="以下是使用 clickhouse 过程中做的一些对比测试，提出假设、设计实验、验证结果，做完拿到数据加深了印象，纠正一些错误的观念，才能在实际业务场景中灵活运用。 批量写入同一个分区和不同分区 假设：一个批次的数据包含多个分区，写入时会产生多个 parts，影响写入效率 结论：不同分区较相同分区，性能相差约 40%  1234567891011121314151617181920212223242">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:updated_time" content="2021-11-19T07:49:58.106Z">
+<meta property="og:updated_time" content="2022-02-08T13:44:40.006Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="clickhouse 测试记录">
-<meta name="twitter:description" content="以下是使用 clickhouse 过程中做的一些对比测试，提出假设、设计实验、验证结果，做完拿到数据加深了印象，纠正一些错误的观念，才能在实际业务场景中灵活运用。">
+<meta name="twitter:title" content="ClickHouse 测试记录">
+<meta name="twitter:description" content="以下是使用 clickhouse 过程中做的一些对比测试，提出假设、设计实验、验证结果，做完拿到数据加深了印象，纠正一些错误的观念，才能在实际业务场景中灵活运用。 批量写入同一个分区和不同分区 假设：一个批次的数据包含多个分区，写入时会产生多个 parts，影响写入效率 结论：不同分区较相同分区，性能相差约 40%  1234567891011121314151617181920212223242">
 
 
 
@@ -126,7 +126,7 @@
 
 
 
-  <title>clickhouse 测试记录 | DataPilot</title>
+  <title>ClickHouse 测试记录 | DataPilot</title>
   
 
 
@@ -280,7 +280,7 @@
 
         
         
-          <h1 class="post-title" itemprop="name headline">clickhouse 测试记录</h1>
+          <h1 class="post-title" itemprop="name headline">ClickHouse 测试记录</h1>
         
 
         <div class="post-meta">
@@ -341,12 +341,12 @@
 
       
         <p>以下是使用 clickhouse 过程中做的一些对比测试，提出假设、设计实验、验证结果，做完拿到数据加深了印象，纠正一些错误的观念，才能在实际业务场景中灵活运用。</p>
-<a id="more"></a>
 <h4 id="批量写入同一个分区和不同分区"><a href="#批量写入同一个分区和不同分区" class="headerlink" title="批量写入同一个分区和不同分区"></a>批量写入同一个分区和不同分区</h4><ul>
 <li>假设：一个批次的数据包含多个分区，写入时会产生多个 parts，影响写入效率</li>
 <li>结论：不同分区较相同分区，性能相差约 40%</li>
 </ul>
 <figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> db_test.t_insert_multi_partitions(</span><br><span class="line">  <span class="keyword">id</span>    UInt32,</span><br><span class="line">  msg   <span class="keyword">String</span>,</span><br><span class="line">  ds    DateTime</span><br><span class="line">)</span><br><span class="line"><span class="keyword">ENGINE</span> = MergeTree()</span><br><span class="line"><span class="keyword">PARTITION</span> <span class="keyword">BY</span> toYYYYMMDD(ds)</span><br><span class="line"><span class="keyword">ORDER</span> <span class="keyword">BY</span> (<span class="keyword">id</span>);</span><br><span class="line"> </span><br><span class="line"><span class="comment">-- 随机写入10个分区</span></span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> db_test.t_insert_multi_partitions (<span class="keyword">id</span>, msg, ds) <span class="keyword">SELECT</span></span><br><span class="line">    <span class="number">1</span> <span class="keyword">AS</span> <span class="keyword">id</span>,</span><br><span class="line">    <span class="string">'foobar'</span> <span class="keyword">AS</span> msg,</span><br><span class="line">    toDateTime(<span class="string">'2020-01-01 00:00:00'</span>) + (<span class="keyword">rand</span>(<span class="number">2</span>) % ((<span class="number">3600</span> * <span class="number">24</span>) * <span class="number">10</span>)) <span class="keyword">AS</span> ds</span><br><span class="line"><span class="keyword">FROM</span> numbers(<span class="number">100000000</span>)</span><br><span class="line"> </span><br><span class="line">Ok.</span><br><span class="line"> </span><br><span class="line"><span class="number">0</span> <span class="keyword">rows</span> <span class="keyword">in</span> set. Elapsed: <span class="number">7.436</span> sec. Processed <span class="number">100.66</span> million <span class="keyword">rows</span>, <span class="number">805.28</span> MB (<span class="number">13.54</span> million <span class="keyword">rows</span>/s., <span class="number">108.30</span> MB/s.)</span><br><span class="line"> </span><br><span class="line"><span class="comment">-- 写入单个分区</span></span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> db_test.t_insert_multi_partitions (<span class="keyword">id</span>, msg, ds) <span class="keyword">SELECT</span></span><br><span class="line">    <span class="number">1</span> <span class="keyword">AS</span> <span class="keyword">id</span>,</span><br><span class="line">    <span class="string">'foobar'</span> <span class="keyword">AS</span> msg,</span><br><span class="line">    toDateTime(<span class="string">'2020-03-01 00:00:00'</span>)</span><br><span class="line"><span class="keyword">FROM</span> numbers(<span class="number">100000000</span>)</span><br><span class="line"> </span><br><span class="line">Ok.</span><br><span class="line"> </span><br><span class="line"><span class="number">0</span> <span class="keyword">rows</span> <span class="keyword">in</span> set. Elapsed: <span class="number">4.491</span> sec. Processed <span class="number">100.66</span> million <span class="keyword">rows</span>, <span class="number">805.28</span> MB (<span class="number">22.41</span> million <span class="keyword">rows</span>/s., <span class="number">179.32</span> MB/s.)</span><br></pre></td></tr></table></figure>
+<a id="more"></a>
 <h4 id="LowCardinality"><a href="#LowCardinality" class="headerlink" title="LowCardinality"></a>LowCardinality</h4><ul>
 <li>场景：数仓开发人员在建表时，在 Hive 下习惯性的使用字符串保存各类枚举值，造成浪费。</li>
 <li>假设：在枚举值不多的情况下（小于10万），官方推荐使用类型编码，压缩效果明显，这里想看下具体压缩率如何？</li>
@@ -422,7 +422,7 @@
   </li>
   <li class="post-copyright-link">
     <strong>本文链接：</strong>
-    <a href="http://www.datapoilt.com/2021/02/16/clickhouse-test/" title="clickhouse 测试记录">http://www.datapoilt.com/2021/02/16/clickhouse-test/</a>
+    <a href="http://www.datapoilt.com/2021/02/16/clickhouse-test/" title="ClickHouse 测试记录">http://www.datapoilt.com/2021/02/16/clickhouse-test/</a>
   </li>
   <li class="post-copyright-license">
     <strong>版权声明： </strong>
@@ -460,8 +460,8 @@
 
           <div class="post-nav-prev post-nav-item">
             
-              <a href="/2021/06/25/presto-orc-tuning/" rel="prev" title="Presto ORC 表调优">
-                Presto ORC 表调优 <i class="fa fa-chevron-right"></i>
+              <a href="/2021/09/04/olap-vectorized-execution/" rel="prev" title="OLAP 向量化执行">
+                OLAP 向量化执行 <i class="fa fa-chevron-right"></i>
               </a>
             
           </div>
@@ -584,7 +584,7 @@
               
                 <a href="/archives/">
               
-                  <span class="site-state-item-count">16</span>
+                  <span class="site-state-item-count">14</span>
                   <span class="site-state-item-name">日志</span>
                 </a>
               </div>
@@ -597,7 +597,7 @@
               
               <div class="site-state-item site-state-tags">
                 
-                  <span class="site-state-item-count">10</span>
+                  <span class="site-state-item-count">9</span>
                   <span class="site-state-item-name">标签</span>
                 
               </div>
